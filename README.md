@@ -1,36 +1,105 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏥 Sistem Informasi & Company Profile PMB Nina Rahayu
 
-## Getting Started
+![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.0-38B2AC?style=for-the-badge&logo=tailwind-css)
+![Supabase](https://img.shields.io/badge/Supabase-Backend-green?style=for-the-badge&logo=supabase)
 
-First, run the development server:
+> **Platform digital terintegrasi untuk Praktik Mandiri Bidan (PMB) Nina Rahayu yang menggabungkan Company Profile modern dengan Sistem Manajemen Klinik berbasis web.**
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📸 Screenshots
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Halaman Utama (Hero) | Dashboard Admin |
+|:---:|:---:|
+| ![Hero Page](https://via.placeholder.com/600x300?text=Screenshot+Hero+Page) | ![Dashboard](https://via.placeholder.com/600x300?text=Screenshot+Dashboard) |
+| *Tampilan Landing Page* | *Tampilan Dashboard Karyawan* |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+*(Ganti link gambar di atas dengan screenshot asli aplikasimu)*
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## ✨ Fitur Utama
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 🌍 Sisi Publik (Company Profile)
+Website responsif yang dirancang untuk membangun kepercayaan pasien dan memberikan informasi layanan.
+- **Hero Section Dinamis:** Background slideshow dengan efek transisi halus.
+- **Layanan Kami:** Grid interaktif menampilkan layanan unggulan (USG, KB, Imunisasi).
+- **Floating WhatsApp:** Tombol konsultasi cepat yang melayang dan responsif.
+- **Galeri Kegiatan:** Dokumentasi visual fasilitas dan kegiatan PMB.
+- **Lokasi & Kontak:** Integrasi Google Maps Embed dan tautan sosial media.
+- **Mitra Resmi:** Menampilkan kerjasama strategis dengan ITSK RS dr. Soepraoen.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 🔐 Sisi Admin (Internal System)
+Sistem backoffice yang dilindungi autentikasi untuk operasional klinik sehari-hari.
+- **Secure Login:** Autentikasi aman menggunakan Supabase Auth & Middleware Protection.
+- **Dashboard Analytics:**
+  - Statistik pasien harian & estimasi pendapatan real-time.
+  - Grafik tren kunjungan pasien.
+  - Notifikasi booking baru dari aplikasi mobile.
+- **Smart Scheduling (3 Sesi):**
+  - Pembagian jadwal (Pagi, Siang, Malam) dengan kuota otomatis.
+  - Mencegah *double booking* dan *over-capacity*.
+- **ANC Reminder Tracker:** Sistem pelacak usia kehamilan pasien dengan tombol pengingat via WhatsApp otomatis.
+- **Auto-Logout Security:** Fitur keamanan otomatis logout jika tidak ada aktivitas selama 15 menit.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🛠️ Teknologi yang Digunakan
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+* **Frontend:** [Next.js 14 (App Router)](https://nextjs.org/)
+* **Language:** [TypeScript](https://www.typescriptlang.org/)
+* **Styling:** [Tailwind CSS](https://tailwindcss.com/)
+* **Animation:** [Framer Motion](https://www.framer.com/motion/)
+* **Icons:** [Lucide React](https://lucide.dev/)
+* **Backend & Database:** [Supabase](https://supabase.com/) (PostgreSQL + Auth)
+* **Deploy:** Vercel (Recommended)
+
+---
+
+## 🚀 Cara Menjalankan Project (Local)
+
+Ikuti langkah ini untuk menjalankan aplikasi di komputer lokal:
+
+1.  **Clone Repository**
+    ```bash
+    git clone [https://github.com/username-kamu/pmb-nina-rahayu.git](https://github.com/username-kamu/pmb-nina-rahayu.git)
+    cd pmb-nina-rahayu
+    ```
+
+2.  **Install Dependencies**
+    ```bash
+    npm install
+    ```
+
+3.  **Setup Environment Variables**
+    Buat file `.env.local` di root folder, lalu isi dengan kredensial Supabase kamu:
+    ```env
+    NEXT_PUBLIC_SUPABASE_URL=[https://your-project-url.supabase.co](https://your-project-url.supabase.co)
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+    ```
+
+4.  **Jalankan Server Development**
+    ```bash
+    npm run dev
+    ```
+
+5.  **Buka Browser**
+    Akses `http://localhost:3000` untuk melihat hasilnya.
+
+---
+
+## 📂 Struktur Project
+pmb-nina-rahayu/ ├── app/ │ ├── components/ # Komponen UI (Navbar, Hero, Footer, dll) │ ├── dashboard/ # Halaman Admin (Protected Route) │ ├── login/ # Halaman Login │ ├── utils/ # Konfigurasi Supabase Client │ ├── layout.tsx # Root Layout │ └── page.tsx # Landing Page Utama ├── public/ │ └── assets/ # Gambar, Logo, dan Icon ├── middleware.ts # Logika proteksi rute (Auth Guard) ├── tailwind.config.ts # Konfigurasi Tema & Warna └── ...
+
+
+---
+
+## 🤝 Kontributor
+
+* **[Arfan Karunia]** - *Lead Developer (Fullstack)*
+
+---
+
+**© 2025 TPMB Nina Rahayu.** All Rights Reserved.
