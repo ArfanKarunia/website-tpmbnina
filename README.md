@@ -58,7 +58,7 @@ Sistem backoffice yang dilindungi autentikasi untuk operasional klinik sehari-ha
 
 ## 🤝 Kontributor
 
-* **[Arfan Karunia]** - *Lead Developer (Fullstack)*
+* **Arfan Karunia** - *Lead Developer (Fullstack)*
 
 ---
 
