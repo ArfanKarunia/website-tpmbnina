@@ -56,12 +56,6 @@ Sistem backoffice yang dilindungi autentikasi untuk operasional klinik sehari-ha
 
 ---
 
-## 📂 Struktur Project
-pmb-nina-rahayu/ ├── app/ │ ├── components/ # Komponen UI (Navbar, Hero, Footer, dll) │ ├── dashboard/ # Halaman Admin (Protected Route) │ ├── login/ # Halaman Login │ ├── utils/ # Konfigurasi Supabase Client │ ├── layout.tsx # Root Layout │ └── page.tsx # Landing Page Utama ├── public/ │ └── assets/ # Gambar, Logo, dan Icon ├── middleware.ts # Logika proteksi rute (Auth Guard) ├── tailwind.config.ts # Konfigurasi Tema & Warna └── ...
-
-
----
-
 ## 🤝 Kontributor
 
 * **[Arfan Karunia]** - *Lead Developer (Fullstack)*
