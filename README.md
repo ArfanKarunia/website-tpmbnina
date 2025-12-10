@@ -13,7 +13,7 @@
 
 | Halaman Utama (Hero) | Dashboard Admin |
 |:---:|:---:|
-| ![Hero Page]<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/140e3588-6b9a-4867-a13b-4c3069f2fe43" />
+| ![Hero Page](https://via.placeholder.com/600x300?text=Screenshot+Hero+Page) |  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/7577574c-cf88-4942-b990-07e718f1b13a" /> |
 | *Tampilan Landing Page* | *Tampilan Dashboard Karyawan* |
 
 | Halaman Utama (Hero) | Dashboard Admin |
