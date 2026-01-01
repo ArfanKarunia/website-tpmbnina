@@ -1,12 +1,14 @@
 import Image from "next/image";
-import { Poppins } from "next/font/google";
 
-const poppins = Poppins({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
-  display: "swap",
-});
 
+
+interface AboutProps {
+  dict: {
+    title: string;
+    description :string;
+    lead_role: string;
+  }
+}
 // --- PENGATURAN DATA TIM ---
 // Di sini kamu bisa atur posisi wajah per orang
 const teamMembers = [
@@ -48,22 +50,18 @@ const teamMembers = [
   },
 ];
 
-export default function About() {
+export default function About({dict}: AboutProps) {
   return (
-    <section id="about" className={`py-20 bg-white ${poppins.className}`}>
+    <section id="about" className={`py-20 bg-white`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* --- 1. HEADER & DESKRIPSI --- */}
         <div className="text-center max-w-4xl mx-auto mb-16">
           <h2 className="text-3xl md:text-4xl font-bold  text-[#1e293b] mb-6">
-            Tentang Kami
+            {dict.title}
           </h2>
           <p className="text-gray-600 text-2g leading-relaxed">
-            TPMB Nina Rahayu berkomitmen memberikan layanan kesehatan ibu dan anak yang profesional dan terpercaya. 
-            Komitmen kami terhadap kualitas layanan juga dibuktikan melalui kerjasama strategis dengan 
-            <span className="font-semibold text-pmb-pink"> ITSK Soepraoen Malang</span>. 
-            Sebagai mitra pendidikan resmi, kami dipercaya menjadi tempat praktik (magang) bagi mahasiswi Kebidanan 
-            untuk mengasah kompetensi klinis mereka.
+            {dict.description}
           </p>
         </div>
 
@@ -75,9 +73,6 @@ export default function About() {
               src="/assets/nina.jpg"
               alt="Nina Rahayu, S.Tr.Keb"
               fill
-              // MANUAL SETTING UNTUK IBU NINA:
-              // Ubah 'object-center' jadi 'object-[50%_25%]' kalau wajahnya kurang pas
-              // Ubah 'scale-100' jadi 'scale-110' kalau fotonya kejauhan
               className="object-cover object-[center_85%] scale-360 transition-transform duration-500 group-hover:scale-330"
             />
           </div>
@@ -85,7 +80,7 @@ export default function About() {
             Nina Rahayu, S.Tr.Keb
           </h3>
           <p className="text-pmb-pink font-medium mt-1">
-            Bidan Utama & Pimpinan
+            {dict.lead_role}
           </p>
         </div>
 

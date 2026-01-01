@@ -1,19 +1,20 @@
 import Link from "next/link";
 import Image from "next/image"; 
-import { Poppins } from "next/font/google";
 
-const poppins = Poppins({
-  weight: ["300", "400", "500", "600"],
-  subsets: ["latin"],
-  display: "swap",
-});
 
-export default function Footer() {
+
+interface FooterProps {
+  dict: {
+    tagline: string;
+  }
+}
+
+export default function Footer({dict}: FooterProps) {
   return (
     <footer
       id="contact"
       // REVISI 1: Padding dikurangi (pt-10 pb-6) biar gak boros tempat
-      className={`bg-[#1e293b] text-white pt-10 pb-6 ${poppins.className}`}
+      className={`bg-[#1e293b] text-white pt-10 pb-6`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
@@ -27,7 +28,7 @@ export default function Footer() {
                 TPMB Nina Rahayu
               </h3>
               <p className="text-gray-400 text-xs">
-                Sahabat Kesehatan Ibu dan Anak
+                {dict.tagline}
               </p>
             </div>
 

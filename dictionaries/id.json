@@ -1,0 +1,65 @@
+{
+  "navbar": {
+    "home": "Beranda",
+    "about": "Tentang",
+    "gallery": "Galeri",
+    "contact": "Lokasi & Kontak",
+    "login": "Login Petugas"
+  },
+  "hero": {
+    "title": "Layanan Kebidanan Profesional dan Terpercaya",
+    "subtitle": "Memberikan pelayanan kesehatan terbaik dengan fasilitas lengkap dan bidan berpengalaman, bermitra resmi dengan Rumah Sakit Tentara Soepraoen.",
+    "cta": "Lihat Profil Bidan"
+  },
+  "about": {
+    "title": "Tentang Kami",
+    "description": "TPMB Nina Rahayu berkomitmen memberikan layanan kesehatan ibu dan anak yang profesional dan terpercaya. Komitmen kami terhadap kualitas layanan juga dibuktikan melalui kerjasama strategis dengan ITSK Soepraoen Malang. Sebagai mitra pendidikan resmi, kami dipercaya menjadi tempat praktik (magang) bagi mahasiswi Kebidanan untuk mengasah kompetensi klinis mereka.",
+    "lead_role": "Bidan Utama & Pimpinan"
+  },
+  "services": {
+    "title": "Layanan Unggulan",
+    "items": [
+      {
+        "title": "Pemeriksaan Kehamilan (ANC)",
+        "desc": "Melayani USG dengan berbagai tipe (2D, 3D, 4D) oleh Dokter yang Bersertifikat untuk memantau perkembangan janin secara detail."
+      },
+      {
+        "title": "Kesehatan Ibu & Anak",
+        "desc": "Melayani Pemeriksaan Kesehatan Ibu dan Anak dengan pendekatan profesional, mulai dari kehamilan hingga tumbuh kembang balita."
+      },
+      {
+        "title": "Keluarga Berencana (KB)",
+        "desc": "Melayani konsultasi dan pemasangan alat kontrasepsi KB (Suntik, Pil, Implan, IUD) sesuai kebutuhan keluarga."
+      }
+    ]
+  },
+  "partner": {
+    "title": "Mitra TPMB Nina Rahayu",
+    "label_floating": "Mitra Pendidikan Resmi",
+    "label_box": "Kampus ITSK Soepraoen",
+    "content_title": "Membangun Generasi Bidan Profesional",
+    "desc": "Kami percaya bahwa pengalaman lapangan adalah guru terbaik. Melalui kemitraan eksklusif dengan ITSK Soepraoen, kami mendedikasikan fasilitas kami sebagai laboratorium nyata bagi para calon bidan masa depan.",
+    "quote": "Kerjasama ini adalah bukti nyata komitmen PMB Nina Rahayu dalam menjaga standar pelayanan medis sekaligus berkontribusi pada dunia pendidikan.",
+    "rektor_name": "Prof. (hon.) Arief Efendi",
+    "rektor_title": "Rektor ITSK Soepraoen"
+  },
+  "gallery": {
+    "title": "Galeri Kegiatan",
+    "description": "Momen kebahagiaan dan pelayanan di TPMB Nina Rahayu",
+    "view_all": "Tampilkan Lebih Banyak",
+    "page_title": "Semua Galeri Kegiatan"
+  },
+  "collaborations": {
+    "title": "Jejaring Kerjasama"
+  },
+  "footer": {
+    "brand": "TPMB Nina Rahayu",
+    "tagline": "Sahabat Kesehatan Ibu dan Anak",
+    "address": "Jl. Raya Lesti No.RT03, RW.11, Gedog Wetan, Kec. Turen, Kab. Malang, Jatim 65175",
+    "phone": "0813-3583-0986",
+    "copyright": "© 2025 TPMB Nina Rahayu. All rights reserved."
+  },
+  "floatingwhatsapp": {
+    "text": "Konsultasi Bidan? Chat Kami! 👋"
+  }
+}

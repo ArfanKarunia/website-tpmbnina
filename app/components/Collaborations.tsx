@@ -1,5 +1,11 @@
 import Image from "next/image";
 
+
+interface CollaborationsProps {
+  dict: {
+    title: string;
+  }
+}
 // Data Logo Partner
 const partners = [
   "/assets/logo-ibi.png",  
@@ -13,12 +19,12 @@ const partners = [
   "/assets/logo.png",
 ];
 
-export default function Collaborations() {
+export default function Collaborations({dict}: CollaborationsProps) {
   return (
     <section className="py-10 bg-white border-t border-b border-gray-100 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8 text-center">
         <h3 className="text-xl font-bold text-gray-400 tracking-widest uppercase">
-          Jejaring Kerjasama
+          {dict.title}
         </h3>
       </div>
 

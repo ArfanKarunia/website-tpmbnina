@@ -1,0 +1,65 @@
+{
+  "navbar": {
+    "home": "Home",
+    "about": "About",
+    "gallery": "Gallery",
+    "contact": "Location & Contact",
+    "login": "Staff Login"
+  },
+  "hero": {
+    "title": "Professional and Trusted Midwifery Services",
+    "subtitle": "Providing the best health services with complete facilities and experienced midwives, officially partnered with Soepraoen Army Hospital.",
+    "cta": "View Midwife Profile"
+  },
+  "about": {
+    "title": "About Us",
+    "description": "TPMB Nina Rahayu is committed to providing professional and trusted maternal and child health services. Our commitment to service quality is also demonstrated through a strategic partnership with ITSK Soepraoen Malang. As an official educational partner, we are trusted as a clinical practice (internship) site for Midwifery students to hone their clinical competencies.",
+    "lead_role": "Head Midwife & Director"
+  },
+  "services": {
+    "title": "Our Services",
+    "items": [
+      {
+        "title": "Pregnancy Checkup (ANC)",
+        "desc": "Serving ultrasound with various types (2D, 3D, 4D) by Certified Doctors to monitor fetal development in detail."
+      },
+      {
+        "title": "Maternal & Child Health",
+        "desc": "Providing Maternal and Child Health Checks with a professional approach, from pregnancy to toddler development."
+      },
+      {
+        "title": "Family Planning (KB)",
+        "desc": "Providing consultation and contraceptive installation (Injection, Pill, Implant, IUD) according to family needs."
+      }
+    ]
+  },
+  "partner": {
+    "title": "Our Partners",
+    "label_floating": "Official Education Partner",
+    "label_box": "ITSK Soepraoen Campus",
+    "content_title": "Building a Generation of Professional Midwives",
+    "desc": "We believe that field experience is the best teacher. Through an exclusive partnership with ITSK Soepraoen, we dedicate our facilities as a real laboratory for future midwives.",
+    "quote": "This collaboration is tangible proof of PMB Nina Rahayu's commitment to maintaining medical service standards while contributing to the world of education.",
+    "rektor_name": "Prof. (hon.) Arief Efendi",
+    "rektor_title": "Rector of ITSK Soepraoen"
+  },
+  "gallery": {
+    "title": "Activity Gallery",
+    "description": "Moments of happiness and service at TPMB Nina Rahayu",
+    "view_all": "Show More",
+    "page_title": "All Gallery Activity"
+  },
+  "collaborations": {
+    "title": "Collaboration Network"
+  },
+  "footer": {
+    "brand": "TPMB Nina Rahayu",
+    "tagline": "Maternal and Child Health Partner",
+    "address": "Jl. Raya Lesti No.RT03, RW.11, Gedog Wetan, Turen Dist., Malang Regency, East Java 65175",
+    "phone": "0813-3583-0986",
+    "copyright": "© 2025 TPMB Nina Rahayu. All rights reserved."
+  },
+  "floatingwhatsapp": {
+    "text": "Midwife Consultation? Chat with Us! 👋"
+  }
+}

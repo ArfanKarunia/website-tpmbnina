@@ -9,6 +9,8 @@ import {
   Stethoscope, 
   Users, 
   Wallet, 
+  Pill,
+  Import,
   LogOut, 
   Menu, 
   Bell, 
@@ -27,6 +29,8 @@ const sidebarMenus = [
   { name: "Pelayanan", href: "/dashboard/reservasi", icon: Stethoscope },
   { name: "Data Pasien", href: "/dashboard/pasien", icon: Users },
   { name: "Keuangan", href: "/dashboard/keuangan", icon: Wallet },
+  { name: "Stok Obat",  href: "/dashboard/obat", icon: Pill },
+  { name: "Import Database",  href: "/dashboard/import", icon: Import },
 ];
 
 export default function DashboardLayout({
@@ -43,14 +47,14 @@ export default function DashboardLayout({
   useEffect(() => {
     // 1. Tentukan batas waktu diam (misal: 15 Menit = 900.000 ms)
     // Ubah angka ini kalau mau lebih cepat/lama (misal 5000 buat tes)
-    const TIMEOUT_MS = 30 * 60 * 1000; 
+    const TIMEOUT_MS = 15 * 60 * 1000; 
     let timeoutId: NodeJS.Timeout;
 
     // 2. Fungsi Logout Paksa
     const doLogout = async () => {
       console.log("Sesi berakhir karena tidak aktif.");
       await supabase.auth.signOut(); // Hapus sesi Supabase
-      router.push("/login"); // Tendang ke login
+      router.push("./"); // Tendang ke Tampilan depan
       router.refresh();
     };
 
@@ -98,11 +102,11 @@ export default function DashboardLayout({
       
       {/* --- SIDEBAR --- */}
       <aside 
-        className={`fixed top-0 left-0 z-40 h-screen transition-transform bg-white border-r border-gray-200 
-          ${isSidebarOpen ? "w-64 translate-x-0" : "w-64 -translate-x-full lg:translate-x-0 lg:w-20 lg:hover:w-64"} 
+        className={`fixed top-0 left-0 z-100 h-screen transition-transform bg-white border-r border-gray-200 
+          ${isSidebarOpen ? "w-64 translate-x-0" : "w-64 -translate-x-full lg:translate-x-0 lg:w-20 "} 
         `}
       >
-        <div className="h-full px-3 py-4 overflow-y-auto flex flex-col overflow-x-hidden">
+        <div className={`h-full px-3 py-4 flex flex-col ${isSidebarOpen ? "overflow-y-auto overflow-x-hidden" : "overflow-visible"}`}>
           
           {/* Logo */}
           <div className="flex items-center justify-between mb-8 px-2 mt-2 h-10">
@@ -133,7 +137,7 @@ export default function DashboardLayout({
             {sidebarMenus.map((menu) => {
               const isActive = pathname === menu.href;
               return (
-                <li key={menu.name}>
+                <li key={menu.name} className="relative group">
                   <Link
                     href={menu.href}
                     className={`flex items-center p-3 rounded-xl transition-all duration-200
@@ -145,14 +149,19 @@ export default function DashboardLayout({
                   >
                     <menu.icon size={22} className={`shrink-0 ${isActive ? "text-blue-600" : "text-gray-400"}`} />
                     <span className={`ml-3 whitespace-nowrap transition-all duration-300 overflow-hidden
-                      ${isSidebarOpen 
-                        ? "w-auto opacity-100" 
-                        : "w-0 opacity-0 lg:w-0 lg:opacity-0 lg:group-hover:w-auto lg:group-hover:opacity-100"
-                      }
+                      ${isSidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0 hidden"}
                     `}>
                         {menu.name}
                     </span>
                   </Link>
+                  {/* POP UP  */}
+                  {!isSidebarOpen && ( 
+                    <div className="absolute left-5 top-1/2 -translate-y-1/2 z-30 ml-2 w-max rounded-md bg-gray-900 px-3 py-2 text-xs font-bold text-white opacity-0 shadow-lg transition-all duration-200 group-hover:left-12 group-hover:opacity-100 pointer-events-none">
+                      {menu.name}
+                      {/* Panah kecil tooltip */}
+                      <div className="absolute left-0 top-1/2 -ml-1 -mt-1 h-2 w-2 -rotate-45 bg-gray-900" />
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -174,6 +183,13 @@ export default function DashboardLayout({
                   Keluar
               </span>
             </button>
+            {/* Tooltip Logout */}
+             {!isSidebarOpen && (
+                <div className="absolute left-14 top-1/2 -translate-y-1/2 z-50 ml-2 w-max rounded-md bg-red-600 px-3 py-2 text-xs font-bold text-white opacity-0 shadow-lg transition-all duration-200 group-hover:left-16 group-hover:opacity-100 pointer-events-none">
+                  Keluar
+                  <div className="absolute left-0 top-1/2 -ml-1 -mt-1 h-2 w-2 -rotate-45 bg-red-600" />
+                </div>
+              )}
           </div>
         </div>
       </aside>
@@ -206,8 +222,11 @@ export default function DashboardLayout({
                     <p className="text-sm font-bold text-gray-700">Nina Rahayu</p>
                     <p className="text-[10px] text-gray-400">Super Admin</p>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-white shadow-sm cursor-pointer">
-                    <Image src="/assets/profilibu.jpg" alt="Profile" width={40} height={40} className="object-cover" />
+                <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-white shadow-sm cursor-pointer relative group">
+                    <Image 
+                    src="/assets/nina.jpg" 
+                    alt="Profile" width={40} height={40} 
+                    className="object-cover scale-[4.0] origin-[50%_60%] transition-transform duration-300" />
                 </div>
             </div>
           </div>

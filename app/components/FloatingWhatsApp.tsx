@@ -5,7 +5,13 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 
-export default function FloatingWhatsApp() {
+interface FloatingWhatsAppProps {
+  dict: {
+    text: string;
+  }
+}
+
+export default function FloatingWhatsApp({dict}: FloatingWhatsAppProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   // Logic: Tombol baru muncul setelah user scroll sedikit ke bawah (misal 100px)
@@ -43,7 +49,7 @@ export default function FloatingWhatsApp() {
             transition={{ delay: 0.5 }} // Muncul telat dikit
             className="bg-white text-gray-700 text-xs font-bold px-3 py-1.5 rounded-lg shadow-md mb-1 mr-1 whitespace-nowrap"
           >
-            Konsultasi Bidan? Chat Kami! 👋
+           {dict.text}
           </motion.div>
 
           {/* Tombol Utama */}

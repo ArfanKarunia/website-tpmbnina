@@ -3,24 +3,24 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Poppins } from "next/font/google";
 import { Reveal } from "./Reveal"; 
-import { motion, AnimatePresence } from "framer-motion"; // Import untuk animasi fade
+import { motion, AnimatePresence } from "framer-motion"; 
 
-const poppins = Poppins({
-  weight: ["400", "500", "700"],
-  subsets: ["latin"],
-  display: "swap",
-});
 
-// DAFTAR GAMBAR BACKGROUND
-// Masukkan path foto-fotomu disini. Bisa 2, 3, atau lebih.
+interface HeroProps {
+  dict: {
+    title: string;
+    subtitle: string;
+    cta: string;
+  }
+}
+
 const heroImages = [
-  "/assets/hero-bg.jpg",   // Foto 1
-  "/assets/hero-bg1.jpg", // Foto 2 (Pastikan file ini ada!)
+  "/assets/hero-bg.jpg",   
+  "/assets/hero-bg1.jpg", 
 ];
 
-export default function Hero() {
+export default function Hero({dict}: HeroProps) {
   const [index, setIndex] = useState(0);
 
   // LOGIKA GANTI GAMBAR OTOMATIS
@@ -63,31 +63,28 @@ export default function Hero() {
       <div className="absolute inset-0 bg-black/50 z-10"></div>
 
       {/* 2. KONTEN TEKS */}
-      <div className={`relative z-20 flex flex-col justify-center h-full w-full px-6 md:px-12 lg:px-20 ${poppins.className}`}>
+      <div className={`relative z-20 flex flex-col justify-center h-full w-full px-6 md:px-12 lg:px-20`}>
         
         <div className="max-w-4xl pt-20"> 
           
           <Reveal>
             <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight mb-6 drop-shadow-md">
-              Layanan Kebidanan <br className="hidden md:block" />
-              Profesional dan Terpercaya
+             {dict.title} 
             </h1>
           </Reveal>
 
           <Reveal delay={0.4}>
             <p className="text-lg md:text-xl text-gray-100 mb-10 max-w-2xl leading-relaxed drop-shadow-sm font-light">
-              Memberikan pelayanan kesehatan terbaik dengan fasilitas lengkap dan
-              bidan berpengalaman, bermitra resmi dengan Rumah Sakit Tentara
-              Soepraoen.
+             {dict.subtitle} 
             </p>
           </Reveal>
 
           <Reveal delay={0.6}>
             <Link
               href="#about"
-              className="inline-block bg-white text-[#1e293b] font-bold px-8 py-3.5 rounded-full hover:bg-black hover:text-white transition-all duration-300 shadow-lg transform hover:-translate-y-1"
+              className="inline-block bg-white text-[#1e293b] font-bold px-8 py-3.5 rounded-full hover:bg-black hover:text-white transition-all duration-300 shadow-lg transform"
             >
-              Lihat Profil Bidan
+             {dict.cta} 
             </Link>
           </Reveal>
 

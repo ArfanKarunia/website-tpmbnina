@@ -1,79 +1,83 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+// Tambahkan daftar bahasa yang didukung
+const locales = ['id', 'en'];
+
 export async function middleware(request: NextRequest) {
-  // 1. Siapkan Response awal
+  const { pathname } = request.nextUrl;
+
+  // 1. Cek apakah URL sudah punya prefix bahasa (/id atau /en)
+  const pathnameHasLocale = locales.some(
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+  );
+
+  // 2. Kalau URL-nya masih polos (misal /dashboard atau /), kita harus cek dulu
+  // Apakah ini file sistem (gambar, api, favicon)? Kalau iya, biarkan lewat.
+  if (
+    !pathnameHasLocale &&
+    !pathname.startsWith('/_next') &&
+    !pathname.includes('.') // Cek ekstensi file (.jpg, .svg, dll)
+  ) {
+    // Redirect default ke bahasa Indonesia (/id)
+    // Contoh: Buka '/' -> Redirect ke '/id'
+    const locale = 'id';
+    request.nextUrl.pathname = `/${locale}${pathname}`;
+    return NextResponse.redirect(request.nextUrl);
+  }
+
+  // --- LOGIKA SUPABASE AUTH (TETAP DIPERTAHANKAN) ---
+  // Kita sesuaikan path dashboard agar support bahasa
+  // Misal: /id/dashboard atau /en/dashboard
+  
   let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+    request: { headers: request.headers },
   });
 
-  // 2. Buat Supabase Client khusus Middleware
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
+        getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({
-            request,
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
         },
       },
     }
   );
 
-  // 3. Cek User yang sedang login
-  // (Penting: pakai getUser, bukan getSession karena lebih aman)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  // 4. ATURAN KEAMANAN (THE LOGIC)
-  const url = request.nextUrl.clone();
+  // Cek Dashboard dengan dukungan locale
+  // Regex: mendeteksi /id/dashboard atau /en/dashboard
+  const isDashboard = /^\/(id|en)\/dashboard/.test(pathname);
+  const isLogin = /^\/(id|en)\/login/.test(pathname);
 
-  // A. PROTEKSI DASHBOARD
-  // Jika user mau masuk ke "/dashboard" TAPI belum login (!user)
-  // Maka tendang ke "/login"
-  if (url.pathname.startsWith("/dashboard") && !user) {
-    url.pathname = "/login";
+  if (isDashboard && !user) {
+    // Redirect ke login dengan bahasa yang sama
+    const locale = pathname.split('/')[1]; // ambil 'id' atau 'en'
+    const url = request.nextUrl.clone();
+    url.pathname = `/${locale}/login`;
     return NextResponse.redirect(url);
   }
 
-  // B. REDIRECT JIKA SUDAH LOGIN
-  // Jika user SUDAH login TAPI mau masuk ke "/login" (ngapain login lagi?)
-  // Maka lempar langsung ke "/dashboard"
-  if (url.pathname === "/login" && user) {
-    url.pathname = "/dashboard";
+  if (isLogin && user) {
+    const locale = pathname.split('/')[1];
+    const url = request.nextUrl.clone();
+    url.pathname = `/${locale}/dashboard`;
     return NextResponse.redirect(url);
   }
 
-  // 5. Kembalikan response (Lanjut)
   return response;
 }
 
-// 6. KONFIGURASI MATCHER
-// Tentukan halaman mana saja yang harus dicek oleh Middleware ini.
-// Kita kecualikan file statis (gambar, icon, dll) biar website gak lemot.
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Matcher dimodifikasi agar menangkap semua path kecuali file statis
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

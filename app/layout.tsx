@@ -8,6 +8,7 @@ import "./globals.css";
 const poppins = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"], // Kita ambil variasi tebalnya juga
+  display: "swap",
   variable: "--font-poppins",
 });
 
