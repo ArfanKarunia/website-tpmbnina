@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏥 Sistem Informasi & Company Profile PMB Nina Rahayu
 
-## Getting Started
+![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.0-38B2AC?style=for-the-badge&logo=tailwind-css)
+![Supabase](https://img.shields.io/badge/Supabase-Backend-green?style=for-the-badge&logo=supabase)
 
-First, run the development server:
+> **Platform digital terintegrasi untuk Praktik Mandiri Bidan (PMB) Nina Rahayu yang menggabungkan Company Profile modern dengan Sistem Manajemen Klinik berbasis web.**
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📸 Screenshots
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Halaman Utama (Hero) | Dashboard Admin |
+|:---:|:---:|
+| <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/140e3588-6b9a-4867-a13b-4c3069f2fe43" /> |  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/7577574c-cf88-4942-b990-07e718f1b13a" /> |
+| *Tampilan Landing Page* | *Tampilan Dashboard Karyawan* |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## ✨ Fitur Utama
 
-To learn more about Next.js, take a look at the following resources:
+### 🌍 Sisi Publik (Company Profile)
+Website responsif yang dirancang untuk membangun kepercayaan pasien dan memberikan informasi layanan.
+- **Hero Section Dinamis:** Background slideshow dengan efek transisi halus.
+- **Layanan Kami:** Grid interaktif menampilkan layanan unggulan (USG, KB, Imunisasi).
+- **Floating WhatsApp:** Tombol konsultasi cepat yang melayang dan responsif.
+- **Galeri Kegiatan:** Dokumentasi visual fasilitas dan kegiatan PMB.
+- **Lokasi & Kontak:** Integrasi Google Maps Embed dan tautan sosial media.
+- **Mitra Resmi:** Menampilkan kerjasama strategis dengan ITSK RS dr. Soepraoen.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 🔐 Sisi Admin (Internal System)
+Sistem backoffice yang dilindungi autentikasi untuk operasional klinik sehari-hari.
+- **Secure Login:** Autentikasi aman menggunakan Supabase Auth & Middleware Protection.
+- **Dashboard Analytics:**
+  - Statistik pasien harian & estimasi pendapatan real-time.
+  - Grafik tren kunjungan pasien.
+  - Notifikasi booking baru dari aplikasi mobile.
+- **Smart Scheduling (3 Sesi):**
+  - Pembagian jadwal (Pagi, Siang, Malam) dengan kuota otomatis.
+  - Mencegah *double booking* dan *over-capacity*.
+- **ANC Reminder Tracker:** Sistem pelacak usia kehamilan pasien dengan tombol pengingat via WhatsApp otomatis.
+- **Auto-Logout Security:** Fitur keamanan otomatis logout jika tidak ada aktivitas selama 15 menit.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🛠️ Teknologi yang Digunakan
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+* **Frontend:** [Next.js 14 (App Router)](https://nextjs.org/)
+* **Language:** [TypeScript](https://www.typescriptlang.org/)
+* **Styling:** [Tailwind CSS](https://tailwindcss.com/)
+* **Animation:** [Framer Motion](https://www.framer.com/motion/)
+* **Icons:** [Lucide React](https://lucide.dev/)
+* **Backend & Database:** [Supabase](https://supabase.com/) (PostgreSQL + Auth)
+* **Deploy:** Vercel (Recommended)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 🤝 Kontributor
+
+* **Arfan Karunia** - *Lead Developer (Fullstack)*
+
+---
+
+**© 2025 TPMB Nina Rahayu.** All Rights Reserved.
