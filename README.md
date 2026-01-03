@@ -52,7 +52,7 @@ Sistem backoffice yang dilindungi autentikasi untuk operasional klinik sehari-ha
 * **Animation:** [Framer Motion](https://www.framer.com/motion/)
 * **Icons:** [Lucide React](https://lucide.dev/)
 * **Backend & Database:** [Supabase](https://supabase.com/) (PostgreSQL + Auth)
-* **Deploy:** Vercel (Recommended)
+* **Deploy:** Vercel 
 
 ---
 
