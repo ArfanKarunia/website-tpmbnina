@@ -3,6 +3,7 @@ import About from "../components/About";
 import Services from "../components/Services";
 import Partners from "../components/Partner";
 import Gallery from "../components/Gallery";
+import Research from "../components/Research";
 import Collaborations from "../components/Collaborations";
 import Footer from "../components/Footer";
 import FloatingWhatsApp from "../components/FloatingWhatsApp";
@@ -27,6 +28,7 @@ export default async function Home({
       <Services dict={dict.services} />
       <Partners dict={dict.partner}/>
       <Gallery lang={lang} dict={dict.gallery}/>
+      <Research dict={dict.research}/>
       <Collaborations dict={dict.collaborations} />
       <Footer dict={dict.footer}/>
       <FloatingWhatsApp dict={dict.floatingwhatsapp}/>

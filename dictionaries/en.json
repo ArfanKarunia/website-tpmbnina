@@ -8,7 +8,7 @@
   },
   "hero": {
     "title": "Professional and Trusted Midwifery Services",
-    "subtitle": "Providing the best health services with complete facilities and experienced midwives, officially partnered with Soepraoen Army Hospital.",
+    "subtitle": "Providing the best health services with complete facilities and experienced midwives, officially partnered with the ITSK Soepraoen Malang Campus.",
     "cta": "View Midwife Profile"
   },
   "about": {
@@ -39,9 +39,9 @@
     "label_box": "ITSK Soepraoen Campus",
     "content_title": "Building a Generation of Professional Midwives",
     "desc": "We believe that field experience is the best teacher. Through an exclusive partnership with ITSK Soepraoen, we dedicate our facilities as a real laboratory for future midwives.",
-    "quote": "This collaboration is tangible proof of PMB Nina Rahayu's commitment to maintaining medical service standards while contributing to the world of education.",
-    "rektor_name": "Prof. (hon.) Arief Efendi",
-    "rektor_title": "Rector of ITSK Soepraoen"
+    "quote": "We greatly appreciate to Nina's comprehensive guidance, from technical competency and professional values ​​to adapting to the digital age. Her active support in ensuring the smooth running of the practice makes this a top-notch clinical learning environment for our students.",
+    "rektor_name": "Raden Maria Veronika, S.ST,. M. Keb",
+    "rektor_title": "Institutional Supervisor, ITSK dr. Soepraoen"
   },
   "gallery": {
     "title": "Activity Gallery",
@@ -61,5 +61,10 @@
   },
   "floatingwhatsapp": {
     "text": "Midwife Consultation? Chat with Us! 👋"
+  },
+  "research": {
+    "section_title": "Latest Research & Information",
+    "section_desc": "We are committed to providing evidence-based services. Below are some of the latest health studies and articles.",
+    "btn_text": "Read more"
   }
 }

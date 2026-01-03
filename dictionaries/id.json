@@ -8,7 +8,7 @@
   },
   "hero": {
     "title": "Layanan Kebidanan Profesional dan Terpercaya",
-    "subtitle": "Memberikan pelayanan kesehatan terbaik dengan fasilitas lengkap dan bidan berpengalaman, bermitra resmi dengan Rumah Sakit Tentara Soepraoen.",
+    "subtitle": "Memberikan pelayanan kesehatan terbaik dengan fasilitas lengkap dan bidan berpengalaman, bermitra resmi dengan Kampus ITSK Soepraoen Malang.",
     "cta": "Lihat Profil Bidan"
   },
   "about": {
@@ -39,9 +39,9 @@
     "label_box": "Kampus ITSK Soepraoen",
     "content_title": "Membangun Generasi Bidan Profesional",
     "desc": "Kami percaya bahwa pengalaman lapangan adalah guru terbaik. Melalui kemitraan eksklusif dengan ITSK Soepraoen, kami mendedikasikan fasilitas kami sebagai laboratorium nyata bagi para calon bidan masa depan.",
-    "quote": "Kerjasama ini adalah bukti nyata komitmen PMB Nina Rahayu dalam menjaga standar pelayanan medis sekaligus berkontribusi pada dunia pendidikan.",
-    "rektor_name": "Prof. (hon.) Arief Efendi",
-    "rektor_title": "Rektor ITSK Soepraoen"
+    "quote": "Kami sangat mengapresiasi Bidan Nina yang membimbing mahasiswa secara menyeluruh, mulai dari kompetensi teknis, nilai profesionalisme, hingga adaptasi di era digital. Dukungan aktif beliau dalam kelancaran praktik membuat tempat ini menjadi lokasi pembelajaran klinik terbaik bagi mahasiswa kami.",
+    "rektor_name": "Raden Maria Veronika, S.ST,. M. Keb",
+    "rektor_title": "Pembimbing Institusi, ITSK dr. Soepraoen"
   },
   "gallery": {
     "title": "Galeri Kegiatan",
@@ -61,5 +61,10 @@
   },
   "floatingwhatsapp": {
     "text": "Konsultasi Bidan? Chat Kami! 👋"
+  },
+  "research": {
+    "section_title": "Riset & Informasi Terkini",
+    "section_desc": "Kami berkomitmen memberikan pelayanan berbasis bukti ilmiah. Berikut adalah beberapa kajian dan artikel kesehatan terbaru.",
+    "btn_text": "Baca Selengkapnya"
   }
 }

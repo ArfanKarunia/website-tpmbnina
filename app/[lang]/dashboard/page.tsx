@@ -6,11 +6,10 @@ import Link from "next/link";
 import { 
   Users, 
   Clock, 
-  CalendarCheck, 
+  Activity, 
   AlertCircle, 
   MessageCircle, 
   MoreVertical, 
-  Activity, 
   FileOutput, 
   Baby,
   UserPlus
@@ -47,7 +46,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({
     totalPasien: 0,
     pendapatan: 0,
-    sisaSlot: 30, // Kapasitas Ruang Tunggu / Antrian Aktif
+    sisaSlot: 30, 
     requestBatal: 0 
   });
 
@@ -86,18 +85,19 @@ export default function DashboardPage() {
 
   const fetchDashboardData = async () => {
       setLoading(true);
+      
       const date = new Date();
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
-      const today = `${year}-${month}-${day}`;
 
-      // 1. Fetch Visits
-      const { data: visits, error: errVisit } = await supabase
-        .from('visits')
-        .select(`id, created_at, queue_status, complaint, patients (name)`)
-        .gte('created_at', `${today}T00:00:00`)
-        .lte('created_at', `${today}T23:59:59`)
+      const today = `${year}-${month}-${day}`;
+      
+      // 1. Fetch Queues
+      const { data: queues, error: errQueue } = await supabase
+        .from('queues')
+        .select(`id, queue_date, session, status, service_type, patient_name, patient_id`)
+        .eq('queue_date', today) 
         .order('created_at', { ascending: true });
 
       // 2. Fetch Transactions
@@ -107,55 +107,54 @@ export default function DashboardPage() {
         .eq('type', 'in')
         .gte('date', today);
       
-      if (errVisit) console.error(errVisit);
+      if (errQueue) console.error("Error fetching queues:", errQueue);
 
-      // --- HITUNG STATS (LOGIKA BARU) ---
-      const totalP = visits?.length || 0; // Total pasien yang datang hari ini (Termasuk Selesai)
+      // Hitung Stats (Total tetap menghitung semua yg daftar hari ini)
+      const totalP = queues?.length || 0; 
       const totalIncome = transactions?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
-      
-      // LOGIKA SLOT: Hanya menghitung yang 'Menunggu' atau 'Diperiksa'
-      // Yang 'Selesai' atau 'Batal' tidak memakan slot antrian
-      const activePatientsCount = visits?.filter(v => 
-          v.queue_status === 'Menunggu' || v.queue_status === 'Diperiksa'
-      ).length || 0;
+      const activeQueueCount = queues?.filter(q => q.status === 'Menunggu' || q.status === 'Diperiksa').length || 0;
 
       setStats({
           totalPasien: totalP,
           pendapatan: totalIncome,
-          sisaSlot: Math.max(0, 30 - activePatientsCount), // Slot kembali penuh jika pasien selesai
+          sisaSlot: Math.max(0, 30 - activeQueueCount),
           requestBatal: 0
       });
 
-      // --- HITUNG SESI & FILTER TAMPILAN ---
+      // --- HITUNG 3 SESI ---
       const newSessions = [
         { id: "pagi", name: "Sesi Pagi", timeRange: "08:00 - 12:00", color: "bg-green-100 text-green-700", capacity: 10, patients: [] as any[] },
         { id: "siang", name: "Sesi Siang", timeRange: "13:00 - 17:00", color: "bg-blue-100 text-blue-700", capacity: 10, patients: [] as any[] },
         { id: "malam", name: "Sesi Malam", timeRange: "18:30 - 21:00", color: "bg-indigo-100 text-indigo-700", capacity: 10, patients: [] as any[] },
       ];
 
-      visits?.forEach((v: any) => {
-          // Filter Visual: Yang Selesai/Batal tidak tampil di List Sesi (Tapi tetap dihitung di Total Pasien)
-          if (v.queue_status === 'Selesai' || v.queue_status === 'Batal') return;
-
-          const time = new Date(v.created_at).getHours();
-          const patientName = Array.isArray(v.patients) ? v.patients[0]?.name : v.patients?.name;   
+      queues?.forEach((q: any) => {
+          if (q.status === 'Selesai' || q.status === 'Batal') return; 
 
           const pData = {
-              id: v.id, 
-              name: patientName || "Tanpa Nama",
-              service: v.complaint || "Pemeriksaan Umum",
-              time: new Date(v.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit'}),
-              status: v.queue_status || "Menunggu"
+              id: q.id, 
+              name: q.patient_name || "Tanpa Nama",
+              service: q.service_type || "Umum",
+              time: q.session, 
+              status: q.status || "Menunggu"
           };
 
-          if (time < 12) newSessions[0].patients.push(pData);
-          else if (time < 18) newSessions[1].patients.push(pData);
-          else newSessions[2].patients.push(pData);
+          const sessionStr = (q.session || "").toLowerCase();
+
+          if (sessionStr.includes("pagi")) {
+            newSessions[0].patients.push(pData);
+          } else if (sessionStr.includes("siang") || sessionStr.includes("sore")) {
+            newSessions[1].patients.push(pData);
+          } else if (sessionStr.includes("malam")) {
+            newSessions[2].patients.push(pData);
+          } else {
+             newSessions[0].patients.push(pData);
+          }
       });
 
       setSessions(newSessions);
 
-      // --- FETCH ANC ---
+      // Fetch Ibu Hamil
       const { data: moms } = await supabase
         .from('patients')
         .select('*')
@@ -177,8 +176,8 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchDashboardData(); }, []);
 
-  const updateStatus = async (visitId: string, newStatus: string) => {
-      await supabase.from('visits').update({ queue_status: newStatus }).eq('id', visitId);
+  const updateStatus = async (queueId: string, newStatus: string) => {
+      await supabase.from('queues').update({ status: newStatus }).eq('id', queueId);
       fetchDashboardData(); 
   };
 
@@ -188,7 +187,7 @@ export default function DashboardPage() {
       {/* HEADER STATS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow">
-          <div><p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Pasien Hari ini</p><h3 className="text-3xl font-bold text-gray-800 mt-1">{loading ? "..." : stats.totalPasien}</h3></div>
+          <div><p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Pasien</p><h3 className="text-3xl font-bold text-gray-800 mt-1">{loading ? "..." : stats.totalPasien}</h3></div>
           <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600"><Users size={24} /></div>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow">
@@ -200,7 +199,7 @@ export default function DashboardPage() {
           <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center text-green-600"><Activity size={24} /></div>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow">
-          <div><p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Permintaan Batal</p><h3 className="text-3xl font-bold text-red-500 mt-1">{stats.requestBatal}</h3></div>
+          <div><p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Batal</p><h3 className="text-3xl font-bold text-red-500 mt-1">{stats.requestBatal}</h3></div>
           <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center text-red-500"><AlertCircle size={24} /></div>
         </div>
       </div>
@@ -208,12 +207,12 @@ export default function DashboardPage() {
       {/* MAIN CONTENT */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* KOLOM KIRI (2/3): JADWAL SESI (ANTRIAN AKTIF) */}
+        {/* KOLOM KIRI (2/3): JADWAL SESI */}
         <div className="lg:col-span-2 space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h2 className="text-lg font-bold text-gray-800">Jadwal Praktik Hari Ini</h2>
-                <p className="text-xs text-gray-500">Pasien yang sudah selesai otomatis hilang dari daftar ini.</p>
+                <p className="text-xs text-gray-500">Antrian Aktif (Menunggu / Diperiksa).</p>
             </div>
             
             <div className="flex items-center gap-2">
@@ -241,9 +240,9 @@ export default function DashboardPage() {
                   {sesi.patients.length > 0 ? (
                     <div className="space-y-3">
                       {sesi.patients.map((patient, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-xl transition-colors group border border-transparent hover:border-gray-100">
+                        <div key={idx} className="flex items-center justify-between p-3 rounded-xl transition-colors group border bg-white hover:bg-blue-50 border-gray-100 hover:border-blue-100">
                           <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm uppercase">{patient.name.charAt(0)}</div>
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm uppercase bg-blue-100 text-blue-600">{patient.name.charAt(0)}</div>
                             <div>
                               <h4 className="font-bold text-gray-800 text-sm">{patient.name}</h4>
                               <p className="text-xs text-gray-500 line-clamp-1">{patient.service}</p>
@@ -251,27 +250,24 @@ export default function DashboardPage() {
                           </div>
                           
                           <div className="flex items-center gap-3">
-                            <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded">{patient.time}</span>
+                            <span className={`text-[10px] font-bold px-2 py-1 rounded border ${
+                                patient.status === 'Menunggu' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
+                                'bg-blue-50 text-blue-600 border-blue-100 animate-pulse'
+                            }`}>
+                                {patient.status}
+                            </span>
                             
-                            {/* Tombol Status Interaktif */}
+                            {/* Tombol Status */}
                             {patient.status === 'Menunggu' && (
-                                <button 
-                                    onClick={() => updateStatus(patient.id, 'Diperiksa')}
-                                    className="text-[10px] uppercase font-bold px-3 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-orange-100 hover:text-orange-600 transition-colors"
-                                >
+                                <button onClick={() => updateStatus(patient.id, 'Diperiksa')} className="text-[10px] uppercase font-bold px-3 py-1 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm">
                                     Panggil
                                 </button>
                             )}
-                            
                             {patient.status === 'Diperiksa' && (
-                                <button 
-                                    onClick={() => updateStatus(patient.id, 'Selesai')}
-                                    className="text-[10px] uppercase font-bold px-3 py-1 rounded-full bg-orange-100 text-orange-700 hover:bg-green-100 hover:text-green-700 transition-colors animate-pulse"
-                                >
-                                    Selesaikan
+                                <button onClick={() => updateStatus(patient.id, 'Selesai')} className="text-[10px] uppercase font-bold px-3 py-1 rounded-full bg-green-500 text-white hover:bg-green-600 transition-colors shadow-sm">
+                                    Selesai
                                 </button>
                             )}
-                            
                             <button className="text-gray-300 hover:text-gray-600"><MoreVertical size={16} /></button>
                           </div>
                         </div>
@@ -279,7 +275,7 @@ export default function DashboardPage() {
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-400 text-sm italic bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
-                      Tidak ada antrian aktif.
+                      Tidak ada antrian di sesi ini.
                     </div>
                   )}
                 </div>
@@ -288,7 +284,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* KOLOM KANAN (Ibu Hamil & Rujukan - Tidak Berubah) */}
+        {/* KOLOM KANAN (Ibu Hamil) */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white rounded-2xl border border-pink-100 shadow-sm p-6 sticky top-6">
             <div className="flex items-center justify-between mb-6">
@@ -317,10 +313,7 @@ export default function DashboardPage() {
                   <div className="text-center py-8 text-gray-400 text-sm italic"><Baby size={32} className="mx-auto mb-2 opacity-20"/>Belum ada data HPHT pasien.</div>
               )}
             </div>
-            <Link 
-            href="/dashboard/kehamilan"
-            className="block w-full mt-6 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors text-center"
-            >
+            <Link href="/dashboard/kehamilan" className="block w-full mt-6 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors text-center">
               Lihat Data Kehamilan
             </Link>
           </div>

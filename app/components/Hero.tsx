@@ -23,28 +23,27 @@ const heroImages = [
 export default function Hero({dict}: HeroProps) {
   const [index, setIndex] = useState(0);
 
-  // LOGIKA GANTI GAMBAR OTOMATIS
+  // LOGIKA GANTI GAMBAR (TETAP SAMA)
   useEffect(() => {
     const timer = setInterval(() => {
-      // Pindah ke index berikutnya. Kalau sudah terakhir, balik ke 0.
       setIndex((prevIndex) => (prevIndex + 1) % heroImages.length);
-    }, 5000); // Ganti gambar setiap 5000ms (5 detik)
+    }, 5000); 
 
-    return () => clearInterval(timer); // Bersihkan timer saat komponen dicopot
+    return () => clearInterval(timer);
   }, []);
 
   return (
     <section id="home" className="relative w-full h-screen min-h-[600px] overflow-hidden">
       
-      {/* 1. BACKGROUND SLIDESHOW */}
+      {/* 1. BACKGROUND SLIDESHOW (TETAP SAMA) */}
       <div className="absolute inset-0 w-full h-full">
         <AnimatePresence initial={false}>
           <motion.div
-            key={index} // Kunci animasi: saat index berubah, animasi jalan
-            initial={{ opacity: 0 }}      // Awal: Transparan
-            animate={{ opacity: 1 }}      // Masuk: Muncul
-            exit={{ opacity: 0 }}         // Keluar: Memudar
-            transition={{ duration: 1.5 }} // Durasi fade 1.5 detik (Smooth)
+            key={index}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.5 }}
             className="absolute inset-0 w-full h-full"
           >
             <Image
@@ -58,31 +57,40 @@ export default function Hero({dict}: HeroProps) {
         </AnimatePresence>
       </div>
 
-      {/* OVERLAY HITAM */}
-      {/* Tetap ditaruh disini supaya teks tetap terbaca walau gambar ganti-ganti */}
-      <div className="absolute inset-0 bg-black/50 z-10"></div>
+      {/* 2. OVERLAY GRADIENT (TETAP SAMA) */}
+      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent z-10"></div>
 
-      {/* 2. KONTEN TEKS */}
+      {/* 3. KONTEN TEKS */}
       <div className={`relative z-20 flex flex-col justify-center h-full w-full px-6 md:px-12 lg:px-20`}>
         
-        <div className="max-w-4xl pt-20"> 
+        <div className="max-w-xl md:max-w-4xl pt-20"> 
           
           <Reveal>
-            <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight mb-6 drop-shadow-md">
+            {/* === PENGATURAN UKURAN FONT === */}
+            
+            {/* JUDUL */}
+            {/* text-3xl : Ukuran di HP (Kecil/Pas) */}
+            {/* md:text-6xl : Ukuran di Laptop (Besar Kembali) */}
+            <h1 className="text-3xl md:text-6xl font-bold text-white leading-tight mb-4 drop-shadow-md">
              {dict.title} 
             </h1>
           </Reveal>
 
           <Reveal delay={0.4}>
-            <p className="text-lg md:text-xl text-gray-100 mb-10 max-w-2xl leading-relaxed drop-shadow-sm font-light">
+            {/* SUBTITLE */}
+            {/* text-sm : Ukuran di HP (Kecil/Ringkas) */}
+            {/* md:text-xl : Ukuran di Laptop (Besar/Jelas) */}
+            <p className="text-sm md:text-xl text-gray-100 mb-8 max-w-lg md:max-w-2xl leading-relaxed drop-shadow-sm font-light">
              {dict.subtitle} 
             </p>
           </Reveal>
 
           <Reveal delay={0.6}>
+            {/* TOMBOL (UKURAN JUGA MENYESUAIKAN) */}
             <Link
               href="#about"
-              className="inline-block bg-white text-[#1e293b] font-bold px-8 py-3.5 rounded-full hover:bg-black hover:text-white transition-all duration-300 shadow-lg transform"
+              // px-6 py-3 (HP) -> md:px-8 md:py-4 (Laptop)
+              className="inline-block bg-white text-[#1e293b] font-bold px-6 py-3 md:px-8 md:py-4 text-sm md:text-base rounded-full hover:bg-black hover:text-white transition-all duration-300 shadow-lg transform active:scale-95"
             >
              {dict.cta} 
             </Link>

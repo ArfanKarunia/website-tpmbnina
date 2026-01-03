@@ -28,8 +28,10 @@ export default function AddReservationModal({ isOpen, onClose }: ModalProps) {
 
   const [formData, setFormData] = useState({
     patient_id: "",
+    patient_name: "",
     visit_date: new Date().toISOString().split('T')[0],
-    session_time: "morning", // default pagi
+    session_time: "Pagi (08:00 - 12:00)",
+    service_type: "Pemeriksaan Umum",
     complaint: ""
   });
 
@@ -54,7 +56,7 @@ export default function AddReservationModal({ isOpen, onClose }: ModalProps) {
   };
 
   const selectPatient = (p: Patient) => {
-      setFormData({ ...formData, patient_id: p.id });
+      setFormData({ ...formData, patient_id: p.id, patient_name: p.name });
       setPatientQuery(p.name);
       setShowDropdown(false);
   };
@@ -66,23 +68,17 @@ export default function AddReservationModal({ isOpen, onClose }: ModalProps) {
 
     setLoading(true);
     try {
-        // Tentukan jam created_at berdasarkan sesi yang dipilih
-        // Pagi: 09:00, Siang: 14:00, Malam: 19:00 (Hanya untuk sorting di dashboard)
-        let timeString = "09:00:00";
-        if (formData.session_time === "afternoon") timeString = "14:00:00";
-        if (formData.session_time === "night") timeString = "19:00:00";
-
-        const visitDateTime = `${formData.visit_date}T${timeString}`;
-
         const payload = {
             patient_id: formData.patient_id,
+            patient_name: formData.patient_name, // Simpan nama biar query gampang
+            queue_date: formData.visit_date,     // Simpan tanggal saja (YYYY-MM-DD)
+            session: formData.session_time,      // Simpan teks sesi (Pagi/Siang/Malam)
+            service_type: formData.service_type, // Jenis Layanan
             complaint: formData.complaint,
-            created_at: visitDateTime, // Hack jam agar masuk ke sesi yg benar
-            queue_status: "Menunggu",
-            transaction_no: `RES-${Date.now()}` // No. Reservasi dummy
+            status: "Menunggu"                   // Default status
         };
 
-        const { error } = await supabase.from("visits").insert([payload]);
+        const { error } = await supabase.from("queues").insert([payload]);
         if (error) throw error;
 
         setShowSuccess(true);
@@ -95,7 +91,8 @@ export default function AddReservationModal({ isOpen, onClose }: ModalProps) {
 
   const handleSuccessClose = () => {
       setShowSuccess(false);
-      onClose(); // Tutup modal & refresh dashboard
+      onClose(); 
+      router.refresh();
   };
 
   if (!isOpen && !showSuccess) return null;
@@ -152,11 +149,23 @@ export default function AddReservationModal({ isOpen, onClose }: ModalProps) {
                   <div>
                       <label className="text-xs font-bold text-gray-500 uppercase mb-1">Pilih Sesi</label>
                       <select className="w-full p-2 border rounded-xl bg-white" value={formData.session_time} onChange={(e) => setFormData({...formData, session_time: e.target.value})}>
-                          <option value="morning">Pagi (08-12)</option>
-                          <option value="afternoon">Siang (13-17)</option>
-                          <option value="night">Malam (18-21)</option>
+                          <option value="Pagi">Pagi (08-12)</option>
+                          <option value="Siang">Siang (13-17)</option>
+                          <option value="Malam">Malam (18-21)</option>
                       </select>
                   </div>
+              </div>
+
+              {/* Layanan */}
+              <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-1">Layanan</label>
+                  <select className="w-full p-2 border rounded-xl bg-white" value={formData.service_type} onChange={(e) => setFormData({...formData, service_type: e.target.value})}>
+                      <option value="Pemeriksaan Umum">Pemeriksaan Umum</option>
+                      <option value="Pemeriksaan Kehamilan">Pemeriksaan Kehamilan</option>
+                      <option value="Imunisasi Anak">Imunisasi Anak</option>
+                      <option value="KB (Keluarga Berencana)">KB</option>
+                      <option value="Persalinan">Persalinan</option>
+                  </select>
               </div>
 
               {/* Keluhan */}
