@@ -63,34 +63,36 @@ export default function Hero({dict}: HeroProps) {
       {/* 3. KONTEN TEKS */}
       <div className={`relative z-20 flex flex-col justify-center h-full w-full px-6 md:px-12 lg:px-20`}>
         
-        <div className="max-w-xl md:max-w-4xl pt-20"> 
+        {/* REVISI: max-w diperkecil di laptop biar teks lebih ngumpul & rapi */}
+        <div className="max-w-xl md:max-w-3xl 2xl:max-w-4xl pt-20"> 
           
           <Reveal>
-            {/* === PENGATURAN UKURAN FONT === */}
+            {/* === UKURAN FONT DIPERKECIL UNTUK LAPTOP === */}
             
             {/* JUDUL */}
-            {/* text-3xl : Ukuran di HP (Kecil/Pas) */}
-            {/* md:text-6xl : Ukuran di Laptop (Besar Kembali) */}
-            <h1 className="text-3xl md:text-6xl font-bold text-white leading-tight mb-4 drop-shadow-md">
+            {/* HP: text-3xl (Kecil) */}
+            {/* Laptop (md/lg): text-5xl (Sedang, tidak lagi 6xl) */}
+            {/* Monitor Besar (2xl): text-6xl (Baru besar) */}
+            <h1 className="text-3xl md:text-5xl 2xl:text-6xl font-bold text-white leading-tight mb-4 drop-shadow-md">
              {dict.title} 
             </h1>
           </Reveal>
 
           <Reveal delay={0.4}>
             {/* SUBTITLE */}
-            {/* text-sm : Ukuran di HP (Kecil/Ringkas) */}
-            {/* md:text-xl : Ukuran di Laptop (Besar/Jelas) */}
-            <p className="text-sm md:text-xl text-gray-100 mb-8 max-w-lg md:max-w-2xl leading-relaxed drop-shadow-sm font-light">
+            {/* HP: text-sm */}
+            {/* Laptop: text-lg (Sebelumnya xl, kita turunkan dikit biar manis) */}
+            <p className="text-sm md:text-lg 2xl:text-xl text-gray-100 mb-8 max-w-lg md:max-w-2xl leading-relaxed drop-shadow-sm font-light">
              {dict.subtitle} 
             </p>
           </Reveal>
 
           <Reveal delay={0.6}>
-            {/* TOMBOL (UKURAN JUGA MENYESUAIKAN) */}
+            {/* TOMBOL */}
+            {/* Laptop: Padding sedikit dikurangi biar tidak terlalu 'gemuk' */}
             <Link
               href="#about"
-              // px-6 py-3 (HP) -> md:px-8 md:py-4 (Laptop)
-              className="inline-block bg-white text-[#1e293b] font-bold px-6 py-3 md:px-8 md:py-4 text-sm md:text-base rounded-full hover:bg-black hover:text-white transition-all duration-300 shadow-lg transform active:scale-95"
+              className="inline-block bg-white text-[#1e293b] font-bold px-6 py-3 md:px-7 md:py-3.5 2xl:px-8 2xl:py-4 text-sm md:text-base rounded-full hover:bg-black hover:text-white transition-all duration-300 shadow-lg transform active:scale-95"
             >
              {dict.cta} 
             </Link>
