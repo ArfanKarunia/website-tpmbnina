@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { X, Save, Stethoscope, Plus, Trash2, Search, Loader2, UserCheck, UserPlus, History, Baby, HeartPulse, User } from "lucide-react";
 import { createClient } from "@/app/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import ActionModal from "./ActionModal";
 
-// Interface
+// --- INTERFACES & TYPES ---
 interface Patient { 
   id: string; 
   name: string; 
@@ -16,7 +16,20 @@ interface Patient {
   hpht?: string;        
   husband_name?: string; 
 }
-interface Medicine { id: string; name: string; price: number; stock: number; }
+
+interface Medicine { 
+  id: string; 
+  name: string; 
+  price: number; 
+  stock: number; 
+}
+
+interface SelectedMedicine {
+  id: string;
+  name: string;
+  qty: number;
+  price: number;
+}
 
 interface MedicalRecord {
   id: string;
@@ -35,6 +48,7 @@ interface MedicalRecord {
   service_fee: number;
   medicine_cost: number;
   total_price: number;
+  risk_level: string;
 }
 
 interface ModalProps {
@@ -43,42 +57,64 @@ interface ModalProps {
   recordToEdit?: MedicalRecord | null;
 }
 
+// --- UTILITY FUNCTIONS (Diluar Component) ---
+const calculateAge = (dobString: string) => {
+  if (!dobString) return 0;
+  const birthday = new Date(dobString);
+  const ageDifMs = Date.now() - birthday.getTime();
+  const ageDate = new Date(ageDifMs);
+  return Math.abs(ageDate.getUTCFullYear() - 1970);
+};
+
+const calculatePregnancy = (hphtDate: string) => {
+  if(!hphtDate) return { uk: "", hpl: "" };
+  const hpht = new Date(hphtDate);
+  const today = new Date();
+  const diffTime = Math.abs(today.getTime() - hpht.getTime());
+  const weeks = Math.floor(Math.ceil(diffTime / (1000 * 60 * 60 * 24)) / 7);
+  const hplDate = new Date(hpht);
+  hplDate.setDate(hplDate.getDate() + 280);
+  const hplString = hplDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  return { uk: `${weeks} Minggu`, hpl: hplString };
+};
+
+// Data Statis untuk Risk Level (Biar codingan rapi)
+const RISK_LEVELS = [
+  { value: 'RR', label: 'RR', desc: 'Resiko Rendah', color: 'green' },
+  { value: 'RT', label: 'RT', desc: 'Resiko Tinggi', color: 'yellow' },
+  { value: 'RST', label: 'RST', desc: 'Resiko Sangat Tinggi', color: 'red' },
+];
+
 export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }: ModalProps) {
   const supabase = createClient();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // LOGIKA SMART SEARCH PASIEN
+  // Search & Patient State
   const [patientQuery, setPatientQuery] = useState("");
   const [patientResults, setPatientResults] = useState<Patient[]>([]);
   const [isSearchingPatient, setIsSearchingPatient] = useState(false);
   const [showPatientDropdown, setShowPatientDropdown] = useState(false);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
-
-  // BADGE STATUS PASIEN
+  
   const [visitCount, setVisitCount] = useState<number>(0); 
   const [isOldPatient, setIsOldPatient] = useState(false);
 
-  // ANC MODE (MODE HAMIL)
+  // ANC State
   const [isAncMode, setIsAncMode] = useState(false);
   const [ancData, setAncData] = useState({
-      husband_name: "",
-      hpht: "",
-      gravida: "", 
-      usg_type: "2D",
-      leopold1: "",
-      leopold2: "",
-      leopold3: "",
-      leopold4: "",
-      djj: "",
+      husband_name: "", hpht: "", gravida: "", usg_type: "2D",
+      leopold1: "", leopold2: "", leopold3: "", leopold4: "", djj: "",
   });
   const [calcResult, setCalcResult] = useState({ uk: "", hpl: "" });
 
-  // Data Master Obat
+  // Medicine State
   const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [selectedMedicines, setSelectedMedicines] = useState<SelectedMedicine[]>([]);
+  const [oldMedicineTrack, setOldMedicineTrack] = useState<{name: string, qty: number}[]>([]);
 
-  // Form State Utama
+  // Main Form State
   const [formData, setFormData] = useState({
     patient_id: "",
     visit_date: new Date().toISOString().split('T')[0],
@@ -91,102 +127,95 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
     temperature: "",
     spo: "",
     service_fee: 0,
+    risk_level: "", // State untuk KSPR
   });
 
-  const [selectedMedicines, setSelectedMedicines] = useState<{id: string, name: string, qty: number, price: number}[]>([]);
-  const [oldMedicineTrack, setOldMedicineTrack] = useState<{name: string, qty: number}[]>([]);
+  // --- EFFECTS ---
 
-  const calculateAge = (dobString: string) => {
-    if (!dobString) return 0;
-    const birthday = new Date(dobString);
-    const ageDifMs = Date.now() - birthday.getTime();
-    const ageDate = new Date(ageDifMs);
-    return Math.abs(ageDate.getUTCFullYear() - 1970);
-  };
-
-  const calculatePregnancy = (hphtDate: string) => {
-      if(!hphtDate) return { uk: "", hpl: "" };
-      const hpht = new Date(hphtDate);
-      const today = new Date();
-      const diffTime = Math.abs(today.getTime() - hpht.getTime());
-      const weeks = Math.floor(Math.ceil(diffTime / (1000 * 60 * 60 * 24)) / 7);
-      const hplDate = new Date(hpht);
-      hplDate.setDate(hplDate.getDate() + 280);
-      const hplString = hplDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-      return { uk: `${weeks} Minggu`, hpl: hplString };
-  };
-
+  // Hitung HPL otomatis saat HPHT berubah
   useEffect(() => {
-      if(ancData.hpht) {
-          const res = calculatePregnancy(ancData.hpht);
-          setCalcResult(res);
-      }
+    if(ancData.hpht) {
+       setCalcResult(calculatePregnancy(ancData.hpht));
+    }
   }, [ancData.hpht]);
 
+  // Init Data saat Modal Buka
   useEffect(() => {
     if (isOpen) {
-      const init = async () => {
-        const { data: medData } = await supabase.from("medicines").select("*").order("name");
-        setMedicines(medData || []);
+      const fetchMedicines = async () => {
+        const { data } = await supabase.from("medicines").select("*").order("name");
+        setMedicines(data || []);
+      };
+      fetchMedicines();
 
-        if (recordToEdit) {
-            setFormData({
-              patient_id: recordToEdit.patient_id,
-              visit_date: recordToEdit.visit_date,
-              diagnosis: recordToEdit.diagnosis,
-              action: recordToEdit.action || "",
-              staff_name: recordToEdit.staff_name || "Bidan Nina",
-              weight: recordToEdit.weight?.toString() || "",
-              blood_pressure: recordToEdit.blood_pressure || "",
-              heart_rate: recordToEdit.heart_rate?.toString() || "",
-              temperature: recordToEdit.temperature?.toString() || "",
-              spo: recordToEdit.oxygen_saturation?.toString() || "",
-              service_fee: recordToEdit.service_fee,
-            });
-            
-            setPatientQuery(recordToEdit.patient_name || ""); 
-            checkPatientHistory(recordToEdit.patient_id); 
+      if (recordToEdit) {
+        // Mode Edit
+        setFormData({
+            patient_id: recordToEdit.patient_id,
+            visit_date: recordToEdit.visit_date,
+            diagnosis: recordToEdit.diagnosis.replace(/G\d+\s-\s/, ''), // Hapus prefix G.. jika ada
+            action: recordToEdit.action?.split('\n\n[ANC Data]')[0] || "", // Ambil action murni
+            staff_name: recordToEdit.staff_name || "Bidan Nina",
+            weight: recordToEdit.weight?.toString() || "",
+            blood_pressure: recordToEdit.blood_pressure || "",
+            heart_rate: recordToEdit.heart_rate?.toString() || "",
+            temperature: recordToEdit.temperature?.toString() || "",
+            spo: recordToEdit.oxygen_saturation?.toString() || "",
+            service_fee: recordToEdit.service_fee,
+            risk_level: recordToEdit.risk_level || "",
+        });
+        
+        setPatientQuery(recordToEdit.patient_name || ""); 
+        checkPatientHistory(recordToEdit.patient_id); 
 
-            if(recordToEdit.diagnosis.toLowerCase().includes('hamil') || recordToEdit.diagnosis.toLowerCase().includes('anc')) {
-                setIsAncMode(true);
-            }
+        // Deteksi ANC Mode dari diagnosa atau data action
+        if(recordToEdit.diagnosis.toLowerCase().includes('hamil') || 
+           recordToEdit.diagnosis.toLowerCase().includes('anc') || 
+           recordToEdit.action.includes('[ANC Data]')) {
+             setIsAncMode(true);
+             // TODO: Parsing data ANC string kembali ke state jika diperlukan (Complex regex)
+        }
 
+        // Load Obat
+        const fetchItems = async () => {
             const { data: items } = await supabase.from('visit_items').select('*, medicines(name)').eq('visit_id', recordToEdit.id);
-            let recoveredCart: any[] = [];
             if (items && items.length > 0) {
-                 recoveredCart = items.map((i: any) => ({
+                 const recoveredCart = items.map((i: any) => ({
                      id: i.item_id,
                      name: i.medicines?.name || "Obat",
                      qty: i.qty,
                      price: i.price_at_transaction
                  }));
+                 setSelectedMedicines(recoveredCart);
+                 setOldMedicineTrack(recoveredCart.map(i => ({ name: i.name, qty: i.qty })));
             }
-            setSelectedMedicines(recoveredCart);
-            setOldMedicineTrack(recoveredCart.map(i => ({ name: i.name, qty: i.qty })));
+        };
+        fetchItems();
 
-        } else {
-            setFormData({
-                patient_id: "", visit_date: new Date().toISOString().split('T')[0], diagnosis: "", action: "",
-                staff_name: "Bidan Nina", weight: "", blood_pressure: "", heart_rate: "", temperature: "", spo: "", service_fee: 0
-            });
-            setAncData({ husband_name: "", hpht: "", gravida: "", usg_type: "2D", leopold1: "", leopold2: "", leopold3: "", leopold4: "", djj: "" });
-            setCalcResult({ uk: "", hpl: "" });
-            setIsAncMode(false);
-            setPatientQuery(""); 
-            setSelectedMedicines([]);
-            setOldMedicineTrack([]);
-            setVisitCount(0);
-            setIsOldPatient(false);
-        }
-      };
-      init();
+      } else {
+        // Mode Baru (Reset)
+        setFormData({
+           patient_id: "", visit_date: new Date().toISOString().split('T')[0], diagnosis: "", action: "",
+           staff_name: "Bidan Nina", weight: "", blood_pressure: "", heart_rate: "", temperature: "", spo: "", service_fee: 0, risk_level: ""
+        });
+        setAncData({ husband_name: "", hpht: "", gravida: "", usg_type: "2D", leopold1: "", leopold2: "", leopold3: "", leopold4: "", djj: "" });
+        setCalcResult({ uk: "", hpl: "" });
+        setIsAncMode(false);
+        setPatientQuery(""); 
+        setSelectedMedicines([]);
+        setOldMedicineTrack([]);
+        setVisitCount(0);
+        setIsOldPatient(false);
+      }
     }
   }, [isOpen, recordToEdit]);
 
+  // --- HANDLERS ---
+
   const checkPatientHistory = async (patientId: string) => {
-      const { count } = await supabase.from('medical_records').select('*', { count: 'exact', head: true }).eq('patient_id', patientId);
-      setVisitCount(count || 0);
-      setIsOldPatient((count || 0) > 0);
+     const { count } = await supabase.from('medical_records').select('*', { count: 'exact', head: true }).eq('patient_id', patientId);
+     setVisitCount(count || 0);
+     setIsOldPatient((count || 0) > 0);
   };
 
   const handleSearchPatient = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -195,7 +224,7 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
     setShowPatientDropdown(true);
 
     if (query === "") {
-        setFormData({ ...formData, patient_id: "" });
+        setFormData(prev => ({ ...prev, patient_id: "" }));
         setPatientResults([]);
         return;
     }
@@ -210,7 +239,7 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
   };
 
   const selectPatient = (patient: Patient) => {
-      setFormData({ ...formData, patient_id: patient.id });
+      setFormData(prev => ({ ...prev, patient_id: patient.id }));
       setPatientQuery(patient.name);
       setShowPatientDropdown(false);
       checkPatientHistory(patient.id);
@@ -222,34 +251,38 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
       }));
   };
 
-  const medicineTotal = selectedMedicines.reduce((acc, item) => acc + (item.price * item.qty), 0);
-  const grandTotal = Number(formData.service_fee) + medicineTotal;
-
+  // Medicine Logic
   const addMedicineToCart = (medId: string) => {
     const med = medicines.find(m => m.id === medId);
     if (med) {
-      const existing = selectedMedicines.find(m => m.id === medId);
-      if (existing) {
-        setSelectedMedicines(selectedMedicines.map(m => m.id === medId ? {...m, qty: m.qty + 1} : m));
-      } else {
-        setSelectedMedicines([...selectedMedicines, { id: med.id, name: med.name, qty: 1, price: med.price }]);
-      }
+      setSelectedMedicines(prev => {
+        const existing = prev.find(m => m.id === medId);
+        if (existing) {
+          return prev.map(m => m.id === medId ? {...m, qty: m.qty + 1} : m);
+        }
+        return [...prev, { id: med.id, name: med.name, qty: 1, price: med.price }];
+      });
     }
   };
 
   const updateQty = (index: number, newQty: number) => {
-      if (newQty < 1) return;
-      const newCart = [...selectedMedicines];
-      newCart[index].qty = newQty;
-      setSelectedMedicines(newCart);
+      if (isNaN(newQty) || newQty < 1) return;
+      setSelectedMedicines(prev => {
+        const newCart = [...prev];
+        newCart[index].qty = newQty;
+        return newCart;
+      });
   };
 
   const removeMedicineFromCart = (index: number) => {
-    const newCart = [...selectedMedicines];
-    newCart.splice(index, 1);
-    setSelectedMedicines(newCart);
+    setSelectedMedicines(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Totals
+  const medicineTotal = useMemo(() => selectedMedicines.reduce((acc, item) => acc + (item.price * item.qty), 0), [selectedMedicines]);
+  const grandTotal = Number(formData.service_fee) + medicineTotal;
+
+  // SUBMIT LOGIC
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.patient_id) return alert("Mohon pilih pasien!");
@@ -261,6 +294,7 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
       const therapyString = selectedMedicines.map(m => `${m.name} (${m.qty})`).join(", ");
       const realAge = selectedPatient?.birth_date ? calculateAge(selectedPatient.birth_date) : 0;
 
+      // 1. Update Data Pasien (ANC Info)
       if (isAncMode) {
           await supabase.from("patients").update({
               hpht: ancData.hpht || null,
@@ -268,23 +302,14 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
           }).eq("id", formData.patient_id);
       }
 
+      // 2. Prepare Payload
       let finalDiagnosis = formData.diagnosis;
       let finalAction = formData.action;
 
       if (isAncMode) {
           finalDiagnosis = `G${ancData.gravida} - ${formData.diagnosis}`; 
-          
-          const ancDetails = `
-[ANC Data]
-Suami: ${ancData.husband_name}
-USG: ${ancData.usg_type}
-DJJ: ${ancData.djj}
-Leo 1: ${ancData.leopold1}
-Leo 2: ${ancData.leopold2}
-Leo 3: ${ancData.leopold3}
-Leo 4: ${ancData.leopold4}
-          `.trim();
-          finalAction = `${formData.action}\n\n${ancDetails}`;
+          const ancDetails = `\n\n[ANC Data]\nSuami: ${ancData.husband_name}\nUSG: ${ancData.usg_type}\nDJJ: ${ancData.djj}\nLeo 1-4: ${ancData.leopold1}/${ancData.leopold2}/${ancData.leopold3}/${ancData.leopold4}`;
+          finalAction = `${formData.action}${ancDetails}`;
       }
 
       const payload = {
@@ -304,6 +329,7 @@ Leo 4: ${ancData.leopold4}
         action: finalAction,
         therapy: therapyString,
         staff_name: formData.staff_name,
+        risk_level: formData.risk_level, // Save KSPR
 
         medicine_cost: medicineTotal,
         service_fee: formData.service_fee,
@@ -313,24 +339,30 @@ Leo 4: ${ancData.leopold4}
       let recordId = recordToEdit?.id;
 
       if (recordToEdit) {
+         // --- LOGIKA EDIT ---
+         // Kembalikan stok obat lama dulu
          const { data: oldItems } = await supabase.from('visit_items').select('*').eq('visit_id', recordId);
-         if (oldItems && oldItems.length > 0) {
+         if (oldItems) {
              for (const item of oldItems) {
                  const { data: med } = await supabase.from('medicines').select('stock').eq('id', item.item_id).single();
                  if (med) await supabase.from('medicines').update({ stock: med.stock + item.qty }).eq('id', item.item_id);
              }
              await supabase.from('visit_items').delete().eq('visit_id', recordId);
          }
+         
          await supabase.from("medical_records").update(payload).eq("id", recordToEdit.id);
          
+         // Update Transaksi
          await supabase.from("transactions").update({ amount: formData.service_fee }).eq("date", recordToEdit.visit_date).eq("category", "Layanan Medis").ilike("description", `%${recordToEdit.patient_name}%`);
          await supabase.from("transactions").update({ amount: medicineTotal }).eq("date", recordToEdit.visit_date).eq("category", "Obat & Vitamin").ilike("description", `%${recordToEdit.patient_name}%`);
 
       } else {
+         // --- LOGIKA INSERT BARU ---
          const { data: newRec, error } = await supabase.from("medical_records").insert([payload]).select().single();
          if (error) throw error;
          recordId = newRec.id;
 
+         // Insert Transaksi
          const transactionsPayload = [];
          if (formData.service_fee > 0) {
              transactionsPayload.push({
@@ -349,6 +381,7 @@ Leo 4: ${ancData.leopold4}
          }
       }
 
+      // 3. Insert Obat Baru & Kurangi Stok
       if (selectedMedicines.length > 0 && recordId) {
           const itemsPayload = selectedMedicines.map(m => ({
               visit_id: recordId, item_id: m.id, qty: m.qty,
@@ -382,17 +415,15 @@ Leo 4: ${ancData.leopold4}
     <>
       {isOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          
-          {/* LAYOUT FIX: Gunakan Flex Col & Max Height */}
           <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
             
-            {/* 1. FIXED HEADER */}
+            {/* 1. HEADER */}
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-blue-600 text-white rounded-t-2xl shrink-0">
               <h3 className="font-bold flex items-center gap-2"><Stethoscope size={20}/> {recordToEdit ? "Edit Rekam Medis" : "Input Pelayanan Baru"}</h3>
               <button onClick={onClose}><X size={20} className="hover:text-red-200" /></button>
             </div>
 
-            {/* 2. SCROLLABLE CONTENT */}
+            {/* 2. CONTENT */}
             <div className="overflow-y-auto p-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
                   
@@ -450,7 +481,6 @@ Leo 4: ${ancData.leopold4}
                           </h4>
                       </div>
 
-                      {/* FORM KHUSUS IBU HAMIL */}
                       {isAncMode && (
                           <div className="mt-4 space-y-4 animate-in slide-in-from-top-2">
                               <div className="grid grid-cols-2 gap-4">
@@ -479,6 +509,37 @@ Leo 4: ${ancData.leopold4}
                       )}
                   </div>
 
+                  {/* KSPR / RISK LEVEL (VERSI OPTIMASI - MAP) */}
+                  <div className="mt-4 p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+                      <label className="block text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                        ⚠️ Klasifikasi Status Resiko (KSPR)
+                        <span className="text-xs font-normal text-gray-400">(Pilih salah satu)</span>
+                      </label>
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        {RISK_LEVELS.map((level) => (
+                           <label key={level.value} className={`
+                              flex-1 flex items-center p-3 border rounded-lg cursor-pointer transition-all
+                              ${formData.risk_level === level.value 
+                                ? `bg-${level.color}-50 border-${level.color}-500 ring-1 ring-${level.color}-500` 
+                                : 'hover:bg-gray-50 border-gray-200'}
+                            `}>
+                              <input
+                                type="radio"
+                                name="risk_level"
+                                value={level.value}
+                                checked={formData.risk_level === level.value}
+                                onChange={(e) => setFormData(prev => ({ ...prev, risk_level: e.target.value }))}
+                                className={`w-4 h-4 text-${level.color}-600 focus:ring-${level.color}-500 border-gray-300`}
+                              />
+                              <div className="ml-3">
+                                <span className="block text-sm font-bold text-gray-800">{level.label}</span>
+                                <span className="block text-xs text-gray-500">{level.desc}</span>
+                              </div>
+                           </label>
+                        ))}
+                      </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div><label className="text-xs font-bold text-gray-500 uppercase mb-1">Diagnosa</label><input type="text" required className="w-full p-2 border rounded-xl" value={formData.diagnosis} onChange={(e) => setFormData({...formData, diagnosis: e.target.value})} /></div>
                     <div><label className="text-xs font-bold text-gray-500 uppercase mb-1">Tindakan</label><input type="text" className="w-full p-2 border rounded-xl" value={formData.action} onChange={(e) => setFormData({...formData, action: e.target.value})} /></div>
@@ -498,7 +559,8 @@ Leo 4: ${ancData.leopold4}
                     </div>
                     <div className="space-y-2">
                         {selectedMedicines.map((item, idx) => (
-                          <div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg text-sm border border-gray-100">
+                          // FIX: Key menggunakan ID bukan Index
+                          <div key={item.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg text-sm border border-gray-100">
                               <div className="flex-1"><span className="font-bold text-gray-700">{item.name}</span><div className="text-xs text-gray-500">Harga Satuan: Rp {item.price}</div></div>
                               <div className="flex items-center gap-3">
                                   <div className="flex items-center bg-white border rounded-md"><span className="px-2 text-xs text-gray-400">Qty</span><input type="number" min="1" className="w-12 p-1 text-center font-bold text-blue-600 outline-none border-l" value={item.qty} onChange={(e) => updateQty(idx, parseInt(e.target.value))} /></div>

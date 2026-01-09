@@ -318,15 +318,26 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group cursor-pointer">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><FileOutput size={100} /></div>
+          <div className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <FileOutput size={100} />
+            </div>
+            
             <h4 className="font-bold text-lg mb-1 relative z-10">Rujukan Darurat?</h4>
             <p className="text-blue-100 text-xs mb-4 relative z-10">Buat surat rujukan RS dengan cepat format BPJS/Umum.</p>
-            <button className="bg-white text-blue-600 w-full py-2.5 rounded-xl text-sm font-bold hover:bg-blue-50 transition-colors shadow-sm relative z-10 flex items-center justify-center gap-2"><FileOutput size={16}/> Buat Surat Rujukan</button>
+          
+            <a 
+              href="https://docs.google.com/document/d/1z3SpSVD5CXBalIF6t7ZQBspC7lXXIc3n7OeAlWKXJDU/edit?usp=sharing" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="bg-white text-blue-600 w-full py-2.5 rounded-xl text-sm font-bold hover:bg-blue-50 transition-colors shadow-sm relative z-10 flex items-center justify-center gap-2 block text-center"
+            >
+              <FileOutput size={16}/> Buat Surat Rujukan
+            </a>
+
           </div>
         </div>
       </div>
-
       <AddReservationModal isOpen={isManualOpen} onClose={() => { setIsManualOpen(false); fetchDashboardData(); }} />
 
     </div>

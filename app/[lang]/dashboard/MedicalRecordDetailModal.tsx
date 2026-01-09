@@ -1,6 +1,6 @@
 "use client";
 
-import { X, User, Activity, FileText, Calendar, DollarSign, Thermometer, Heart, UserCheck } from "lucide-react";
+import { X, User, Activity, FileText, Calendar, DollarSign, Thermometer, Heart, UserCheck, AlertTriangle } from "lucide-react";
 
 interface MedicalRecord {
   id: string;
@@ -25,6 +25,9 @@ interface MedicalRecord {
   medicine_cost: number;
   service_fee: number;
   total_price: number;
+
+  // TAMBAHAN: Risk Level
+  risk_level?: string; 
 }
 
 interface ModalProps {
@@ -35,6 +38,27 @@ interface ModalProps {
 
 export default function MedicalRecordDetailModal({ isOpen, onClose, data }: ModalProps) {
   if (!isOpen || !data) return null;
+
+  // Helper untuk menentukan warna & teks resiko
+  const getRiskInfo = (level: string) => {
+      switch(level) {
+          case 'RST': return { 
+              bg: 'bg-red-50 border-red-200', text: 'text-red-800', badge: 'bg-red-600', 
+              label: 'Resiko Sangat Tinggi' 
+          };
+          case 'RT': return { 
+              bg: 'bg-yellow-50 border-yellow-200', text: 'text-yellow-800', badge: 'bg-yellow-500', 
+              label: 'Resiko Tinggi' 
+          };
+          case 'RR': return { 
+              bg: 'bg-green-50 border-green-200', text: 'text-green-800', badge: 'bg-green-600', 
+              label: 'Resiko Rendah' 
+          };
+          default: return null;
+      }
+  };
+
+  const riskInfo = data.risk_level ? getRiskInfo(data.risk_level) : null;
 
   return (
     <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -67,6 +91,19 @@ export default function MedicalRecordDetailModal({ isOpen, onClose, data }: Moda
              </div>
           </div>
 
+          {/* --- BAGIAN BARU: DISPLAY STATUS RESIKO --- */}
+          {riskInfo && (
+             <div className={`p-3 rounded-xl border flex items-center gap-3 ${riskInfo.bg}`}>
+                <div className={`${riskInfo.badge} text-white font-bold px-2 py-1 rounded text-xs`}>
+                    {data.risk_level}
+                </div>
+                <div>
+                    <h5 className={`font-bold text-sm ${riskInfo.text}`}>Klasifikasi Resiko</h5>
+                    <p className={`text-xs ${riskInfo.text} opacity-80`}>{riskInfo.label}</p>
+                </div>
+             </div>
+          )}
+
           {/* Tanda Vital */}
           <div>
              <h5 className="text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-2"><Activity size={14}/> Tanda Vital</h5>
@@ -98,11 +135,12 @@ export default function MedicalRecordDetailModal({ isOpen, onClose, data }: Moda
           <div className="space-y-3">
              <div>
                 <h5 className="text-xs font-bold text-gray-400 uppercase mb-1">Diagnosa</h5>
-                <p className="text-sm font-medium text-gray-800 bg-gray-50 p-2 rounded border border-gray-100">{data.diagnosis}</p>
+                <p className="text-sm font-medium text-gray-800 bg-gray-50 p-2 rounded border border-gray-100 whitespace-pre-wrap">{data.diagnosis}</p>
              </div>
              <div>
                 <h5 className="text-xs font-bold text-gray-400 uppercase mb-1">Tindakan</h5>
-                <p className="text-sm text-gray-700">{data.action || "-"}</p>
+                {/* whitespace-pre-wrap agar enter/baris baru terbaca */}
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{data.action || "-"}</p>
              </div>
              <div>
                 <h5 className="text-xs font-bold text-gray-400 uppercase mb-1">Terapi / Obat</h5>
