@@ -27,6 +27,7 @@ interface MedicalRecord {
   staff_name: string;
   medicine_cost: number;
   service_fee: number;
+  risk_level: string;
 }
 
 export default function PelayananPage() {
