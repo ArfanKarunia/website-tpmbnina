@@ -30,7 +30,7 @@ const sidebarMenus = [
   { name: "Data Pasien", href: "/dashboard/pasien", icon: Users },
   { name: "Keuangan", href: "/dashboard/keuangan", icon: Wallet },
   { name: "Stok Obat",  href: "/dashboard/obat", icon: Pill },
-  { name: "Import Database",  href: "/dashboard/import", icon: Import },
+  { name: "Import Riset",  href: "/dashboard/cms/research", icon: Import },
 ];
 
 export default function DashboardLayout({
@@ -44,51 +44,51 @@ export default function DashboardLayout({
   const supabase = createClient();
 
   // --- LOGIKA AUTO LOGOUT (KEAMANAN) ---
-  useEffect(() => {
-    // 1. Tentukan batas waktu diam (misal: 15 Menit = 900.000 ms)
-    // Ubah angka ini kalau mau lebih cepat/lama (misal 5000 buat tes)
-    const TIMEOUT_MS = 15 * 60 * 1000; 
-    let timeoutId: NodeJS.Timeout;
+  // useEffect(() => {
+  //   // 1. Tentukan batas waktu diam (misal: 15 Menit = 900.000 ms)
+  //   // Ubah angka ini kalau mau lebih cepat/lama (misal 5000 buat tes)
+  //   const TIMEOUT_MS = 15 * 60 * 1000; 
+  //   let timeoutId: NodeJS.Timeout;
 
-    // 2. Fungsi Logout Paksa
-    const doLogout = async () => {
-      console.log("Sesi berakhir karena tidak aktif.");
-      await supabase.auth.signOut(); // Hapus sesi Supabase
-      router.push("./"); // Tendang ke Tampilan depan
-      router.refresh();
-    };
+  //   // 2. Fungsi Logout Paksa
+  //   const doLogout = async () => {
+  //     console.log("Sesi berakhir karena tidak aktif.");
+  //     await supabase.auth.signOut(); // Hapus sesi Supabase
+  //     router.push("./"); // Tendang ke Tampilan depan
+  //     router.refresh();
+  //   };
 
-    // 3. Fungsi Reset Timer (Kalau user gerak, timer ulang dari 0)
-    const resetTimer = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(doLogout, TIMEOUT_MS);
-    };
+  //   // 3. Fungsi Reset Timer (Kalau user gerak, timer ulang dari 0)
+  //   const resetTimer = () => {
+  //     if (timeoutId) clearTimeout(timeoutId);
+  //     timeoutId = setTimeout(doLogout, TIMEOUT_MS);
+  //   };
 
-    // 4. Daftar aktivitas yang dianggap "Aktif"
-    const events = [
-      "mousedown", // Klik mouse
-      "mousemove", // Gerakin mouse
-      "keydown",   // Ngetik keyboard
-      "scroll",    // Scrolling
-      "touchstart" // Sentuh layar (HP)
-    ];
+  //   // 4. Daftar aktivitas yang dianggap "Aktif"
+  //   const events = [
+  //     "mousedown", // Klik mouse
+  //     "mousemove", // Gerakin mouse
+  //     "keydown",   // Ngetik keyboard
+  //     "scroll",    // Scrolling
+  //     "touchstart" // Sentuh layar (HP)
+  //   ];
 
-    // 5. Pasang "CCTV" (Event Listeners)
-    events.forEach((event) => {
-      window.addEventListener(event, resetTimer);
-    });
+  //   // 5. Pasang "CCTV" (Event Listeners)
+  //   events.forEach((event) => {
+  //     window.addEventListener(event, resetTimer);
+  //   });
 
-    // Jalankan timer pertama kali
-    resetTimer();
+  //   // Jalankan timer pertama kali
+  //   resetTimer();
 
-    // 6. Bersih-bersih kalau komponen ditutup (biar gak memory leak)
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      events.forEach((event) => {
-        window.removeEventListener(event, resetTimer);
-      });
-    };
-  }, [router, supabase]); // Dependency array
+  //   // 6. Bersih-bersih kalau komponen ditutup (biar gak memory leak)
+  //   return () => {
+  //     if (timeoutId) clearTimeout(timeoutId);
+  //     events.forEach((event) => {
+  //       window.removeEventListener(event, resetTimer);
+  //     });
+  //   };
+  // }, [router, supabase]); // Dependency array
 
   // --- FUNGSI LOGOUT MANUAL (Tombol Keluar) ---
   const handleLogout = async () => {

@@ -9,6 +9,7 @@ import Footer from "../components/Footer";
 import FloatingWhatsApp from "../components/FloatingWhatsApp";
 import Navbar from "../components/Navbar";
 import { getDictionary } from ".././utils/get-dictionary";
+import { createClient } from "@/app/utils/supabase/server";
 
 
 
@@ -20,6 +21,12 @@ export default async function Home({
   // 1. AWAIT PARAMS DULU (Wajib di Next.js 15)
   const { lang } = await params; 
   const dict = await getDictionary(lang);
+  const supabase = await createClient();
+  const { data: articles } = await supabase
+    .from('articles')
+    .select('id, title, category, created_at, excerpt')
+    .order('created_at', { ascending: false })
+    .limit(3);
   return (
     <main className="relative">
       <Navbar lang={lang} dict={dict.navbar} />
@@ -28,7 +35,7 @@ export default async function Home({
       <Services dict={dict.services} />
       <Partners dict={dict.partner}/>
       <Gallery lang={lang} dict={dict.gallery}/>
-      <Research dict={dict.research}/>
+      <Research dict={dict.research} articles={articles || []}/>
       <Collaborations dict={dict.collaborations} />
       <Footer dict={dict.footer}/>
       <FloatingWhatsApp dict={dict.floatingwhatsapp}/>
