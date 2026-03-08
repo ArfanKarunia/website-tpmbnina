@@ -211,7 +211,7 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
 
       const payload = {
         visit_date: formData.visit_date, patient_id: formData.patient_id, patient_name: selectedPatient?.name,
-        patient_address: selectedPatient?.address, patient_age: realAge + " TH",
+        patient_address: selectedPatient?.address, patient_age: realAge,
         weight: parseFloat(formData.weight) || 0, blood_pressure: formData.blood_pressure,
         heart_rate: parseInt(formData.heart_rate) || 0, temperature: parseFloat(formData.temperature) || 0,
         oxygen_saturation: parseFloat(formData.spo) || 0, diagnosis: finalDiagnosis, action: finalAction,

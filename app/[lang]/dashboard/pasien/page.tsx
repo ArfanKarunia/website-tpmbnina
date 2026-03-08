@@ -51,16 +51,43 @@ export default function PasienPage() {
 
   // Helper: Hitung Umur
   const calculateAge = (birthDateString: string) => {
-    if (!birthDateString) return 0;
-    const today = new Date();
-    const birthDate = new Date(birthDateString);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
+  if (!birthDateString) return "-";
+  
+  const today = new Date();
+  const birthDate = new Date(birthDateString);
+  
+  let years = today.getFullYear() - birthDate.getFullYear();
+  let months = today.getMonth() - birthDate.getMonth();
+  let days = today.getDate() - birthDate.getDate();
+
+  // Jika hari negatif, pinjam hari dari bulan sebelumnya
+  if (days < 0) {
+    months--;
+    const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    days += prevMonth.getDate();
+  }
+
+  // Jika bulan negatif, pinjam bulan dari tahun sebelumnya
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+
+  // --- LOGIKA BARU SESUAI PERMINTAAN ---
+  if (years >= 1) {
+    // Jika 1 tahun atau lebih, cukup tampilkan tahunnya saja
+    return `${years} TH`;
+  } else {
+    // Jika di bawah 1 tahun, tampilkan detail bulan dan hari
+    if (months > 0 && days > 0) {
+      return `${months} BLN ${days} HARI`;
+    } else if (months > 0 && days === 0) {
+      return `${months} BLN`; 
+    } else {
+      return `${days} HARI`; 
     }
-    return age;
-  };
+  }
+};
 
   const fetchPatients = async () => {
     setIsLoading(true);
@@ -192,7 +219,7 @@ export default function PasienPage() {
                     <p className="text-xs text-gray-500 font-mono flex items-center gap-1 mt-0.5">
                       <CreditCard size={10} /> {patient.nik || "-"} 
                       <span className="mx-1">•</span> 
-                      {calculateAge(patient.birth_date)} Th
+                      {calculateAge(patient.birth_date)}
                     </p>
                   </div>
                 </div>

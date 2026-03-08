@@ -9,7 +9,7 @@ interface MedicalRecord {
   visit_date: string;
   patient_name: string;
   patient_address: string;
-  patient_age: string; // Format contoh: "25 TH", "10 BLN"
+  patient_age: string; 
   diagnosis: string;
   action: string;
   therapy: string;
