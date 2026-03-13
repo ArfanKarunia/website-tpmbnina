@@ -6,7 +6,6 @@ import { createClient } from "@/app/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import ActionModal from "./ActionModal"; 
 
-// Definisikan tipe data Pasien
 interface Patient {
   id: string;
   nik: string;
@@ -19,21 +18,18 @@ interface Patient {
   husband_name?: string; 
 }
 
-// INI BAGIAN PENTINGNYA: Definisi Props
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   patientToEdit?: Patient | null;
 }
 
-// Function Component menerima ModalProps
 export default function AddPatientModal({ isOpen, onClose, patientToEdit }: ModalProps) {
   const supabase = createClient();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // State Form
   const [formData, setFormData] = useState({
     nik: "",         
     name: "",
@@ -45,11 +41,9 @@ export default function AddPatientModal({ isOpen, onClose, patientToEdit }: Moda
     husband_name: "" 
   });
 
-  // LOGIKA: Deteksi Mode Edit vs Tambah
   useEffect(() => {
     if (isOpen) {
       if (patientToEdit) {
-        // Mode Edit
         setFormData({
           nik: patientToEdit.nik || "",
           name: patientToEdit.name,
@@ -61,7 +55,6 @@ export default function AddPatientModal({ isOpen, onClose, patientToEdit }: Moda
           husband_name: patientToEdit.husband_name || ""
         });
       } else {
-        // Mode Tambah
         setFormData({
           nik: "",
           name: "",
@@ -87,6 +80,7 @@ export default function AddPatientModal({ isOpen, onClose, patientToEdit }: Moda
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validasi panjang NIK
     if (formData.nik.length !== 16) {
       alert("NIK harus terdiri dari 16 digit angka.");
       return;
@@ -95,32 +89,55 @@ export default function AddPatientModal({ isOpen, onClose, patientToEdit }: Moda
     setLoading(true);
 
     try {
-      const payload = {
-        nik: formData.nik,
-        name: formData.name,
-        birth_date: formData.birth_date,
-        gender: formData.gender, 
-        phone: formData.phone,
-        address: formData.address,
-        type: formData.type,
-        husband_name: formData.husband_name
-      };
-
       if (patientToEdit) {
+        // --- MODE EDIT (UPDATE) ---
+        
+        // PENGAMAN BARU: Jika NIK diubah, cek apakah NIK baru ini sudah dipakai pasien lain
+        if (formData.nik !== patientToEdit.nik) {
+            const { data: existing } = await supabase.from('patients').select('id').eq('nik', formData.nik).single();
+            if (existing && existing.id !== patientToEdit.id) {
+                throw new Error("NIK ini sudah terdaftar atas nama pasien lain!");
+            }
+        }
+
+        // Sekarang NIK dimasukkan kembali ke payload agar bisa di-update
+        const updatePayload = {
+          nik: formData.nik, 
+          name: formData.name,
+          birth_date: formData.birth_date,
+          gender: formData.gender, 
+          phone: formData.phone,
+          address: formData.address,
+          type: formData.type,
+          husband_name: formData.husband_name
+        };
+
         const { error } = await supabase
           .from("patients")
-          .update(payload)
+          .update(updatePayload)
           .eq("id", patientToEdit.id);
+          
         if (error) throw error;
+        
       } else {
-        // Cek NIK Double
+        // --- MODE TAMBAH (INSERT) ---
+        const insertPayload = {
+          nik: formData.nik,
+          name: formData.name,
+          birth_date: formData.birth_date,
+          gender: formData.gender, 
+          phone: formData.phone,
+          address: formData.address,
+          type: formData.type,
+          husband_name: formData.husband_name,
+          created_at: new Date().toISOString()
+        };
+
+        // Cek NIK Double sebelum insert
         const { data: existing } = await supabase.from('patients').select('id').eq('nik', formData.nik).single();
         if (existing) throw new Error("NIK Pasien sudah terdaftar!");
 
-        const { error } = await supabase.from("patients").insert([{
-          ...payload,
-          created_at: new Date().toISOString()
-        }]);
+        const { error } = await supabase.from("patients").insert([insertPayload]);
         if (error) throw error;
       }
 
@@ -135,7 +152,6 @@ export default function AddPatientModal({ isOpen, onClose, patientToEdit }: Moda
 
   return (
     <>
-      {/* FORM MODAL */}
       {isOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -152,7 +168,7 @@ export default function AddPatientModal({ isOpen, onClose, patientToEdit }: Moda
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               
-              {/* NIK */}
+              {/* NIK (SUDAH BISA DIEDIT KEMBALI) */}
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">
                   <CreditCard size={12}/> NIK (KTP/KK)
@@ -162,10 +178,9 @@ export default function AddPatientModal({ isOpen, onClose, patientToEdit }: Moda
                   type="text" 
                   maxLength={16}
                   placeholder="16 Digit NIK..."
-                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono tracking-wide"
+                  className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono tracking-wide transition-colors"
                   value={formData.nik}
                   onChange={(e) => setFormData({...formData, nik: e.target.value.replace(/\D/g, '')})}
-                  readOnly={!!patientToEdit} 
                 />
               </div>
 
