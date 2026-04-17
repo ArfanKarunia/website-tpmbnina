@@ -24,12 +24,41 @@ interface ModalProps {
 }
 
 // --- UTILITY ---
-const calculateAge = (dobString: string) => {
-  if (!dobString) return 0;
-  const birthday = new Date(dobString);
-  const ageDifMs = Date.now() - birthday.getTime();
-  const ageDate = new Date(ageDifMs);
-  return Math.abs(ageDate.getUTCFullYear() - 1970);
+const calculateAge = (birthDateString: string) => {
+  if (!birthDateString) return "-";
+  
+  const today = new Date();
+  const birthDate = new Date(birthDateString);
+  
+  let years = today.getFullYear() - birthDate.getFullYear();
+  let months = today.getMonth() - birthDate.getMonth();
+  let days = today.getDate() - birthDate.getDate();
+
+  // Jika hari negatif, pinjam hari dari bulan sebelumnya
+  if (days < 0) {
+    months--;
+    const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    days += prevMonth.getDate();
+  }
+
+  // Jika bulan negatif, pinjam bulan dari tahun sebelumnya
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+
+  // LOGIKA OUTPUT UMUR
+  if (years >= 1) {
+    return `${years} TH`;
+  } else {
+    if (months > 0 && days > 0) {
+      return `${months} BLN ${days} HARI`;
+    } else if (months > 0 && days === 0) {
+      return `${months} BLN`; 
+    } else {
+      return `${days} HARI`; 
+    }
+  }
 };
 const calculatePregnancy = (hphtDate: string) => {
   if(!hphtDate) return { uk: "", hpl: "" };
@@ -192,7 +221,7 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
     try {
       const { data: selectedPatient } = await supabase.from("patients").select("*").eq("id", formData.patient_id).single();
       const therapyString = selectedMedicines.map(m => `${m.name} (${m.qty})`).join(", ");
-      const realAge = selectedPatient?.birth_date ? calculateAge(selectedPatient.birth_date) : 0;
+      const realAge = selectedPatient?.birth_date ? calculateAge(selectedPatient.birth_date) : "-";
 
       if (isAncMode) await supabase.from("patients").update({ hpht: ancData.hpht || null, husband_name: ancData.husband_name }).eq("id", formData.patient_id);
 
@@ -331,7 +360,7 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
                         {showPatientDropdown && patientQuery.length > 0 && (
                             <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
                                 {patientResults.map((p) => (
-                                    <div key={p.id} onClick={() => selectPatient(p)} className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0"><p className="text-sm font-bold text-gray-800">{p.name}</p><p className="text-xs text-gray-500">{p.address} • {p.birth_date ? calculateAge(p.birth_date) : "-"} Th</p></div>
+                                    <div key={p.id} onClick={() => selectPatient(p)} className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0"><p className="text-sm font-bold text-gray-800">{p.name}</p><p className="text-xs text-gray-500">{p.address} • {p.birth_date ? calculateAge(p.birth_date) : "-"}</p></div>
                                 ))}
                             </div>
                         )}
