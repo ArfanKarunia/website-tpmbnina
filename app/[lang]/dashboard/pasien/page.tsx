@@ -51,50 +51,62 @@ export default function PasienPage() {
 
   // Helper: Hitung Umur
   const calculateAge = (birthDateString: string) => {
-  if (!birthDateString) return "-";
-  
-  const today = new Date();
-  const birthDate = new Date(birthDateString);
-  
-  let years = today.getFullYear() - birthDate.getFullYear();
-  let months = today.getMonth() - birthDate.getMonth();
-  let days = today.getDate() - birthDate.getDate();
+    if (!birthDateString) return "-";
+    
+    const today = new Date();
+    const birthDate = new Date(birthDateString);
+    
+    let years = today.getFullYear() - birthDate.getFullYear();
+    let months = today.getMonth() - birthDate.getMonth();
+    let days = today.getDate() - birthDate.getDate();
 
-  // Jika hari negatif, pinjam hari dari bulan sebelumnya
-  if (days < 0) {
-    months--;
-    const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-    days += prevMonth.getDate();
-  }
-
-  // Jika bulan negatif, pinjam bulan dari tahun sebelumnya
-  if (months < 0) {
-    years--;
-    months += 12;
-  }
-
-  // --- LOGIKA BARU SESUAI PERMINTAAN ---
-  if (years >= 1) {
-    // Jika 1 tahun atau lebih, cukup tampilkan tahunnya saja
-    return `${years} TH`;
-  } else {
-    // Jika di bawah 1 tahun, tampilkan detail bulan dan hari
-    if (months > 0 && days > 0) {
-      return `${months} BLN ${days} HARI`;
-    } else if (months > 0 && days === 0) {
-      return `${months} BLN`; 
-    } else {
-      return `${days} HARI`; 
+    if (days < 0) {
+      months--;
+      const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      days += prevMonth.getDate();
     }
-  }
-};
 
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+
+    if (years >= 1) {
+      return `${years} TH`;
+    } else {
+      if (months > 0 && days > 0) {
+        return `${months} BLN ${days} HARI`;
+      } else if (months > 0 && days === 0) {
+        return `${months} BLN`; 
+      } else {
+        return `${days} HARI`; 
+      }
+    }
+  };
+
+  // --- UPGRADE: SUPER SEARCH (TEMBUS DATABASE) ---
   const fetchPatients = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
+    
+    let query = supabase
       .from("patients")
       .select("*")
       .order("created_at", { ascending: false });
+
+    // 1. Tembuskan pencarian Nama & NIK ke Database
+    if (searchTerm.trim() !== "") {
+      query = query.or(`name.ilike.%${searchTerm.trim()}%,nik.ilike.%${searchTerm.trim()}%`);
+    }
+
+    // 2. Tembuskan Filter BPJS/Umum ke Database
+    if (filterType !== "all") {
+      query = query.eq("type", filterType);
+    }
+
+    // 3. Batasi 50 data agar web tidak lemot / nge-lag saat pertama buka
+    query = query.limit(50);
+
+    const { data, error } = await query;
 
     if (error) console.error("Error fetching patients:", error);
     else setPatients(data || []);
@@ -102,9 +114,15 @@ export default function PasienPage() {
     setIsLoading(false);
   };
 
+  // --- UPGRADE: PASANG MATA-MATA (DEBOUNCE) ---
+  // Setiap kali staff ngetik di search atau ganti dropdown, fetch ulang!
   useEffect(() => {
-    fetchPatients();
-  }, []);
+    const delaySearch = setTimeout(() => {
+      fetchPatients();
+    }, 300); // Tunggu 0.3 detik setelah staff selesai ngetik biar database gak jebol
+
+    return () => clearTimeout(delaySearch);
+  }, [searchTerm, filterType]); 
 
   // LOGIKA DELETE
   const handleDeleteClick = (id: string, name: string) => {
@@ -142,17 +160,6 @@ export default function PasienPage() {
     setIsModalOpen(true);
   };
 
-  // Filter Logic
-  const filteredPatients = patients.filter((patient) => {
-    const searchLower = searchTerm.toLowerCase();
-    const matchSearch = 
-      patient.name.toLowerCase().includes(searchLower) ||
-      (patient.nik && patient.nik.includes(searchTerm)) || 
-      (patient.address && patient.address.toLowerCase().includes(searchLower));
-    const matchType = filterType === "all" || patient.type === filterType;
-    return matchSearch && matchType;
-  });
-
   return (
     <div className="space-y-8">
       
@@ -176,7 +183,13 @@ export default function PasienPage() {
       <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row items-center gap-4">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input type="text" placeholder="Cari nama, NIK, atau alamat..." className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <input 
+            type="text" 
+            placeholder="Cari nama atau 16 Digit NIK dari database..." 
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+          />
         </div>
         <select className="w-full md:w-auto px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
           <option value="all">Semua Tipe</option>
@@ -190,9 +203,10 @@ export default function PasienPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (<div key={i} className="bg-gray-100 h-40 rounded-2xl animate-pulse"></div>))}
         </div>
-      ) : filteredPatients.length > 0 ? (
+      ) : patients.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPatients.map((patient) => (
+          {/* KITA PAKAI 'patients', BUKAN 'filteredPatients' LAGI */}
+          {patients.map((patient) => (
             <div key={patient.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all group relative">
               
               <div className="flex justify-between items-start mb-4">
@@ -215,7 +229,7 @@ export default function PasienPage() {
                         </span>
                     </div>
 
-                    {/* BARIS NIK & UMUR (Tidak berubah) */}
+                    {/* BARIS NIK & UMUR */}
                     <p className="text-xs text-gray-500 font-mono flex items-center gap-1 mt-0.5">
                       <CreditCard size={10} /> {patient.nik || "-"} 
                       <span className="mx-1">•</span> 
@@ -259,7 +273,7 @@ export default function PasienPage() {
         <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-300">
            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400"><AlertCircle size={32} /></div>
            <h3 className="text-gray-800 font-bold text-lg">Data tidak ditemukan</h3>
-           <p className="text-gray-500 text-sm mb-6">Coba cari dengan NIK atau Nama lain.</p>
+           <p className="text-gray-500 text-sm mb-6">Pastikan nama atau NIK yang dicari sudah benar.</p>
         </div>
       )}
 
