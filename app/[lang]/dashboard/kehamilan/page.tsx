@@ -10,10 +10,10 @@ import {
   MessageCircle, 
   AlertTriangle,
   ArrowLeft,
-  FileText // Icon Detail
+  FileText 
 } from "lucide-react";
 import Link from "next/link";
-import AncHistoryModal from "./AncHistoryModal"; // Import Modal Baru
+import AncHistoryModal from "./AncHistoryModal"; 
 
 interface PregnantMom {
   id: string;
@@ -22,7 +22,6 @@ interface PregnantMom {
   phone: string;
   hpht: string;
   husband_name?: string;
-  // Calculated fields
   hpl?: string;
   uk?: number; 
   trimester?: number;
@@ -36,19 +35,41 @@ export default function KehamilanPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterTri, setFilterTri] = useState("all"); 
 
-  // STATE UNTUK MODAL HISTORY
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedMom, setSelectedMom] = useState<{id: string, name: string} | null>(null);
 
-  // --- HELPER: RUMUS KEHAMILAN ---
+  // --- HELPER: RUMUS KEHAMILAN NAEGELE (SUPER AMAN) ---
   const calculatePregnancy = (hphtDate: string) => {
+      // 1. Cek jika data kosong atau tidak valid
+      if (!hphtDate || hphtDate.trim() === "") {
+        return { uk: -1, hpl: "-", status: "-", trimester: 0 };
+      }
+
       const hpht = new Date(hphtDate);
+      if (isNaN(hpht.getTime())) {
+        return { uk: -1, hpl: "-", status: "-", trimester: 0 };
+      }
+
       const today = new Date();
-      const diffTime = Math.abs(today.getTime() - hpht.getTime());
-      const weeks = Math.floor(Math.ceil(diffTime / (1000 * 60 * 60 * 24)) / 7);
-      
+      hpht.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0);
+
+      // 2. HITUNG HPL (RUMUS NAEGELE)
       const hplDate = new Date(hpht);
-      hplDate.setDate(hplDate.getDate() + 280);
+      if (hplDate.getMonth() <= 2) { 
+        hplDate.setMonth(hplDate.getMonth() + 9);
+      } else {
+        hplDate.setMonth(hplDate.getMonth() - 3);
+        hplDate.setFullYear(hplDate.getFullYear() + 1);
+      }
+      hplDate.setDate(hplDate.getDate() + 7);
+      
+      const hplString = hplDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      // 3. HITUNG USIA KEHAMILAN (UK)
+      const diffTime = today.getTime() - hpht.getTime();
+      const totalDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      const weeks = Math.floor(totalDays / 7);
       
       let trimester = 1;
       let status = "Aman";
@@ -59,12 +80,7 @@ export default function KehamilanPage() {
           status = weeks >= 37 ? "Siaga" : "Pantau";
       }
 
-      return { 
-          uk: weeks, 
-          hpl: hplDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }), 
-          status, 
-          trimester 
-      };
+      return { uk: weeks, hpl: hplString, status, trimester };
   };
 
   useEffect(() => {
@@ -73,22 +89,27 @@ export default function KehamilanPage() {
       const { data, error } = await supabase
         .from("patients")
         .select("*")
-        .not("hpht", "is", null)
-        .order("hpht", { ascending: true }); 
+        .not("hpht", "is", null) 
+        .order("hpht", { ascending: false }); 
 
       if (error) console.error(error);
       
       if (data) {
-          const processed = data.map((p) => {
-              const calc = calculatePregnancy(p.hpht);
-              return {
-                  ...p,
-                  hpl: calc.hpl,
-                  uk: calc.uk,
-                  trimester: calc.trimester,
-                  status: calc.status
-              };
-          });
+          const processed = data
+            .map((p) => {
+                const calc = calculatePregnancy(p.hpht);
+                return {
+                    ...p,
+                    hpl: calc.hpl,
+                    uk: calc.uk,
+                    trimester: calc.trimester,
+                    status: calc.status
+                };
+            })
+            // FILTER PENYELAMAT: Hanya tampilkan usia kehamilan 0 - 45 minggu
+            // Yang usianya 69 minggu atau minus (salah input) akan disembunyikan otomatis!
+            .filter((mom) => (mom.uk !== undefined) && mom.uk >= 0 && mom.uk <= 45); 
+
           setMoms(processed);
       }
       setLoading(false);
@@ -108,7 +129,6 @@ export default function KehamilanPage() {
       return matchSearch && matchFilter;
   });
 
-  // Handler Buka Modal
   const handleOpenHistory = (mom: PregnantMom) => {
       setSelectedMom({ id: mom.id, name: mom.name });
       setIsHistoryOpen(true);
@@ -211,7 +231,6 @@ export default function KehamilanPage() {
                               <MessageCircle size={14}/> WhatsApp
                           </a>
                           
-                          {/* BUTTON DETAIL (Sekarang Berfungsi) */}
                           <button 
                             onClick={() => handleOpenHistory(mom)}
                             className="flex-1 border border-gray-200 text-gray-600 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
@@ -233,8 +252,8 @@ export default function KehamilanPage() {
       ) : (
           <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-300">
              <Baby size={48} className="mx-auto mb-4 text-gray-300"/>
-             <h3 className="text-gray-800 font-bold">Belum ada data ibu hamil</h3>
-             <p className="text-gray-500 text-sm">Pastikan mengisi kolom HPHT saat input data pasien.</p>
+             <h3 className="text-gray-800 font-bold">Belum ada data ibu hamil aktif</h3>
+             <p className="text-gray-500 text-sm">Coba daftarkan HPHT baru (misal: Awal 2026) agar masuk rentang 0-45 minggu.</p>
           </div>
       )}
 

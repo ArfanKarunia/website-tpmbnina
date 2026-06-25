@@ -60,16 +60,52 @@ const calculateAge = (birthDateString: string) => {
     }
   }
 };
-const calculatePregnancy = (hphtDate: string) => {
+// --- LOGIKA UK & HPL KEBIDANAN (RUMUS NAEGELE) ---
+const calculatePregnancy = (hphtDate: string, visitDateString: string) => {
   if(!hphtDate) return { uk: "", hpl: "" };
+
   const hpht = new Date(hphtDate);
-  const today = new Date();
-  const diffTime = Math.abs(today.getTime() - hpht.getTime());
-  const weeks = Math.floor(Math.ceil(diffTime / (1000 * 60 * 60 * 24)) / 7);
+  const visitDate = visitDateString ? new Date(visitDateString) : new Date();
+
+  hpht.setHours(0, 0, 0, 0);
+  visitDate.setHours(0, 0, 0, 0);
+
+  // 1. HITUNG HPL DENGAN RUMUS NAEGELE 
+  // (Hari + 7) lalu (Bulan + 9, Tahun tetap) ATAU (Bulan - 3, Tahun + 1)
   const hplDate = new Date(hpht);
-  hplDate.setDate(hplDate.getDate() + 280);
+  
+  if (hplDate.getMonth() <= 2) { 
+    // Jika HPHT Jan, Feb, Mar (Index 0, 1, 2)
+    hplDate.setMonth(hplDate.getMonth() + 9);
+  } else {
+    // Jika HPHT April - Des
+    hplDate.setMonth(hplDate.getMonth() - 3);
+    hplDate.setFullYear(hplDate.getFullYear() + 1);
+  }
+  
+  hplDate.setDate(hplDate.getDate() + 7);
+  
   const hplString = hplDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-  return { uk: `${weeks} Minggu`, hpl: hplString };
+
+  // 2. HITUNG USIA KEHAMILAN (UK) BERDASARKAN TGL PERIKSA
+  const diffTime = visitDate.getTime() - hpht.getTime();
+  
+  if (diffTime < 0) {
+    return { uk: "Salah Input HPHT", hpl: hplString };
+  }
+
+  const totalDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const weeks = Math.floor(totalDays / 7);
+  const days = totalDays % 7;
+
+  let ukString = `${weeks} Minggu ${days} Hari`;
+
+  // Warning jika kehamilan lewat waktu (Post-term > 42 minggu)
+  if (weeks > 42) {
+    ukString += " ⚠️ (Lewat HPL)";
+  }
+
+  return { uk: ukString, hpl: hplString };
 };
 const RISK_LEVELS = [
   { value: 'RR', label: 'RR', desc: 'Resiko Rendah', color: 'green' },
@@ -107,8 +143,11 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
   });
 
   // --- EFFECTS ---
-  useEffect(() => { if(ancData.hpht) setCalcResult(calculatePregnancy(ancData.hpht)); }, [ancData.hpht]);
-
+useEffect(() => { 
+  if(ancData.hpht) {
+    setCalcResult(calculatePregnancy(ancData.hpht, formData.visit_date)); 
+  }
+}, [ancData.hpht, formData.visit_date]);
   useEffect(() => {
     if (isOpen) {
       const initData = async () => {
@@ -389,7 +428,31 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
                       {isAncMode && (
                           <div className="mt-4 space-y-4 animate-in slide-in-from-top-2">
                               <div className="grid grid-cols-2 gap-4">
-                                  <div><label className="text-xs font-bold text-gray-500 uppercase mb-1">HPHT (Penting!)</label><input type="date" className="w-full p-2 border rounded-xl focus:ring-2 focus:ring-pink-500" value={ancData.hpht} onChange={(e) => setAncData({...ancData, hpht: e.target.value})} />{calcResult.uk && (<p className="text-xs text-pink-600 mt-1 font-bold">UK: {calcResult.uk} • HPL: {calcResult.hpl}</p>)}</div>
+                                  <div><label className="text-xs font-bold text-gray-500 uppercase mb-1">HPHT (Penting!)</label><input type="date" className="w-full p-2 border rounded-xl focus:ring-2 focus:ring-pink-500" value={ancData.hpht} onChange={(e) => setAncData({...ancData, hpht: e.target.value})} />
+                                  {calcResult.uk && (
+                                    <div className="flex items-center justify-between mt-1">
+                                  <p className={`text-xs font-bold ${parseInt(calcResult.uk) > 42 ? 'text-red-600' : 'text-pink-600'}`}>
+                                    UK: {calcResult.uk} • HPL: {calcResult.hpl}
+                                  </p>
+                                                                
+                                  {/* TOMBOL RESET JIKA DATA SUDAH LAMA / LEBIH DARI 42 MINGGU */}
+                                  {parseInt(calcResult.uk) > 42 && (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if(confirm("Hapus data HPHT lama pasien ini? (Gunakan jika pasien sudah melahirkan)")) {
+                                          await supabase.from("patients").update({ hpht: null }).eq("id", formData.patient_id);
+                                          setAncData(prev => ({ ...prev, hpht: "" })); // Kosongkan di tampilan
+                                          alert("Data HPHT berhasil dihapus.");
+                                        }
+                                      }}
+                                      className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-md hover:bg-red-200 font-bold"
+                                    >
+                                      Reset HPHT
+                                    </button>
+                                  )}
+                                </div>
+                              )}</div>
                                   <div><label className="text-xs font-bold text-gray-500 uppercase mb-1">Nama Suami</label><input type="text" className="w-full p-2 border rounded-xl" value={ancData.husband_name} onChange={(e) => setAncData({...ancData, husband_name: e.target.value})} /></div>
                               </div>
                               <div className="grid grid-cols-2 gap-4">

@@ -156,22 +156,40 @@ export default function DashboardPage() {
 
       // Fetch Ibu Hamil
       const { data: moms } = await supabase
-        .from('patients')
-        .select('*')
-        .not('hpht', 'is', null) 
-        .order('hpht', { ascending: true })
-        .limit(5);
+  .from('patients')
+  .select('*')
+  .not('hpht', 'is', null);
+  // Hapus order dan limit di sini! Kita lakukan filternya pakai Javascript di bawah.
       
-      if (moms) {
-          setAncPatients(moms.map((m) => {
-              const calc = calculatePregnancy(m.hpht);
-              return {
-                  id: m.id, name: m.name, hpht: m.hpht, phone: m.phone,
-                  usiaKehamilan: calc.weeks, hpl: calc.hpl, status: calc.status, trimester: calc.trimester
-              };
-          }));
-      }
-      setLoading(false);
+if (moms) {
+  const processedMoms = moms
+    .map((m) => {
+      const calc = calculatePregnancy(m.hpht);
+      return {
+        id: m.id, 
+        name: m.name, 
+        hpht: m.hpht, 
+        phone: m.phone,
+        // Cek nama properti dari fungsi calculatePregnancy-mu, apakah 'uk' atau 'weeks'
+        usiaKehamilan: calc.weeks !== undefined ? calc.weeks : calc.weeks, 
+        hpl: calc.hpl, 
+        status: calc.status, 
+        trimester: calc.trimester
+      };
+    })
+    // 1. FILTER: Buang pasien ghaib yang sudah melahirkan (> 45 minggu)
+    .filter(mom => mom.usiaKehamilan !== undefined && mom.usiaKehamilan >= 0 && mom.usiaKehamilan <= 45)
+    
+    // 2. SORTING: Urutkan dari usia paling besar (Misal: 38 minggu di atas, 4 minggu di bawah)
+    // Tujuannya agar Bidan Nina fokus ke pasien yang mau lahiran dulu.
+    .sort((a, b) => b.usiaKehamilan - a.usiaKehamilan)
+    
+    // 3. LIMIT: Baru kita ambil 5 orang teratas untuk di widget Dashboard
+    .slice(0, 5);
+
+  setAncPatients(processedMoms);
+}
+setLoading(false);
   };
 
   useEffect(() => { fetchDashboardData(); }, []);
@@ -292,7 +310,11 @@ export default function DashboardPage() {
               <span className="text-[10px] bg-pink-50 text-pink-600 px-2 py-1 rounded-full font-bold">Auto-HPL</span>
             </div>
             <div className="space-y-4">
-              {ancPatients.length > 0 ? ancPatients.map((mom, idx) => (
+              {/* --- KITA TAMBAHKAN FILTER MAKSIMAL 45 MINGGU DI SINI --- */}
+              {ancPatients.filter(mom => mom.usiaKehamilan >= 0 && mom.usiaKehamilan <= 45).length > 0 ? 
+                ancPatients
+                  .filter(mom => mom.usiaKehamilan >= 0 && mom.usiaKehamilan <= 45)
+                  .map((mom, idx) => (
                 <div key={idx} className={`p-4 rounded-xl border transition-all group bg-white ${mom.usiaKehamilan >= 37 ? 'border-red-200 bg-red-50/50' : 'border-gray-100 hover:border-pink-200'}`}>
                   <div className="flex justify-between items-start mb-2">
                     <div>
@@ -310,7 +332,10 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )) : (
-                  <div className="text-center py-8 text-gray-400 text-sm italic"><Baby size={32} className="mx-auto mb-2 opacity-20"/>Belum ada data HPHT pasien.</div>
+                  <div className="text-center py-8 text-gray-400 text-sm italic">
+                    <Baby size={32} className="mx-auto mb-2 opacity-20"/>
+                    Belum ada data bumil aktif.
+                  </div>
               )}
             </div>
             <Link href="/dashboard/kehamilan" className="block w-full mt-6 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors text-center">

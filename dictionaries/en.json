@@ -20,7 +20,7 @@
     "title": "Our Services",
     "items": [
       {
-        "title": "Pregnancy Checkup (ANC)",
+        "title": "Pregnancy Checkup",
         "desc": "Serving ultrasound with various types (2D, 3D, 4D) by Certified Doctors to monitor fetal development in detail."
       },
       {
@@ -35,13 +35,30 @@
   },
   "partner": {
     "title": "Our Partners",
+    "partners": [
+      {
+    "image_main": "/assets/itsk.jpg",
     "label_floating": "Official Education Partner",
     "label_box": "ITSK Soepraoen Campus",
     "content_title": "Building a Generation of Professional Midwives",
     "desc": "We believe that field experience is the best teacher. Through an exclusive partnership with ITSK Soepraoen, we dedicate our facilities as a real laboratory for future midwives.",
     "quote": "We greatly appreciate to Nina's comprehensive guidance, from technical competency and professional values ​​to adapting to the digital age. Her active support in ensuring the smooth running of the practice makes this a top-notch clinical learning environment for our students.",
-    "rektor_name": "Raden Maria Veronika, S.ST,. M. Keb",
-    "rektor_title": "Institutional Supervisor, ITSK dr. Soepraoen"
+    "person_name": "Raden Maria Veronika, S.ST,. M. Keb",
+    "person_title": "Institutional Supervisor, ITSK dr. Soepraoen",
+    "person_image": "/assets/maria.jpeg"
+      },
+      {
+    "image_main": "/assets/mtdi.png", 
+    "label_floating": "Technology Partner",
+    "label_box": "Mountain Digital Innovation",
+    "content_title": "Digitalizing Healthcare Services",
+    "desc": "Manual record-keeping often consumes the valuable time of medical professionals. Recognizing this challenge, we stepped in to build a technological infrastructure that simplifies the process. In collaboration with Mountain Digital Innovation (MTDI), TPMB Nina is transforming into a modern clinic with a fast, secure, and efficient digital medical record system.",
+    "quote": "We designed this system specifically for TPMB Nina so that midwives can focus on maternal and child health services, while technology takes care of the administration automatically..",
+    "person_name": "Arfan Karunia",
+    "person_title": "Founder, MTDI",
+    "person_image": "/assets/profile_arfan.jpg" 
+    }
+  ]
   },
   "gallery": {
     "title": "Activity Gallery",

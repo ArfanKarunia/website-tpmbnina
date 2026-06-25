@@ -1,7 +1,5 @@
 import Image from "next/image";
 
-
-
 interface AboutProps {
   dict: {
     title: string;

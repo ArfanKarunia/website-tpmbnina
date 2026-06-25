@@ -20,28 +20,45 @@
     "title": "Layanan Unggulan",
     "items": [
       {
-        "title": "Pemeriksaan Kehamilan (ANC)",
-        "desc": "Melayani USG dengan berbagai tipe (2D, 3D, 4D) oleh Dokter yang Bersertifikat untuk memantau perkembangan janin secara detail."
+        "title": "Pemeriksaan USG",
+        "desc": "Layanan USG dengan berbagai tipe (2D, 3D, 4D) oleh Dokter yang Bersertifikat untuk memantau perkembangan janin secara detail."
       },
       {
         "title": "Kesehatan Ibu & Anak",
-        "desc": "Melayani Pemeriksaan Kesehatan Ibu dan Anak dengan pendekatan profesional, mulai dari kehamilan hingga tumbuh kembang balita."
+        "desc": "Pemeriksaan Kesehatan Ibu dan Anak dengan pendekatan profesional, mulai dari kehamilan hingga tumbuh kembang balita."
       },
       {
         "title": "Keluarga Berencana (KB)",
-        "desc": "Melayani konsultasi dan pemasangan alat kontrasepsi KB (Suntik, Pil, Implan, IUD) sesuai kebutuhan keluarga."
+        "desc": "Konsultasi dan pemasangan alat kontrasepsi KB (Suntik, Pil, Implan, IUD) sesuai kebutuhan keluarga."
       }
     ]
   },
   "partner": {
-    "title": "Mitra TPMB Nina Rahayu",
+    "title": "Beberapa Mitra TPMB Nina Rahayu",
+    "partners": [
+      {
+    "image_main": "/assets/itsk.jpg",
     "label_floating": "Mitra Pendidikan Resmi",
     "label_box": "Kampus ITSK Soepraoen",
     "content_title": "Membangun Generasi Bidan Profesional",
     "desc": "Kami percaya bahwa pengalaman lapangan adalah guru terbaik. Melalui kemitraan eksklusif dengan ITSK Soepraoen, kami mendedikasikan fasilitas kami sebagai laboratorium nyata bagi para calon bidan masa depan.",
     "quote": "Kami sangat mengapresiasi Bidan Nina yang membimbing mahasiswa secara menyeluruh, mulai dari kompetensi teknis, nilai profesionalisme, hingga adaptasi di era digital. Dukungan aktif beliau dalam kelancaran praktik membuat tempat ini menjadi lokasi pembelajaran klinik terbaik bagi mahasiswa kami.",
-    "rektor_name": "Raden Maria Veronika, S.ST,. M. Keb",
-    "rektor_title": "Pembimbing Institusi, ITSK dr. Soepraoen"
+    "person_name": "Raden Maria Veronika, S.ST,. M. Keb",
+    "person_title": "Pembimbing Institusi, ITSK dr. Soepraoen",
+    "person_image": "/assets/maria.jpeg"
+      },
+      {
+    "image_main": "/assets/mtdi.png", 
+    "label_floating": "Technology Partner",
+    "label_box": "Mountain Digital Innovation",
+    "content_title": "Digitalisasi Pelayanan Kesehatan",
+    "desc": "Pencatatan manual seringkali menyita waktu berharga tenaga medis. Menyadari tantangan ini, kami hadir untuk membangun infrastruktur teknologi yang menyederhanakan proses tersebut. Bekerja sama dengan Mountain Digital Innovation (MTDI), TPMB Nina bertransformasi menjadi klinik modern dengan sistem rekam medis digital yang cepat, aman, dan efisien.",
+    "quote": "Kami merancang sistem ini khusus untuk TPMB Nina agar bidan dapat fokus pada pelayanan kesehatan ibu dan anak, sementara teknologi yang mengurus administrasinya secara otomatis.",
+    "person_name": "Arfan Karunia",
+    "person_title": "Founder, MTDI",
+    "person_image": "/assets/profile_arfan.jpg" 
+    }
+  ]
   },
   "gallery": {
     "title": "Galeri Kegiatan",

@@ -115,7 +115,7 @@ export default function Footer({dict}: FooterProps) {
             © {new Date().getFullYear()} TPMB Nina Rahayu. All rights reserved.
           </p>
           <p className="text-[10px] text-gray-500 font-medium">
-            Develop by <span className="text-[#5f5f5f] font-bold italic">Piibool_</span>
+            Develop by <span className="text-[#5f5f5f] font-bold italic">MT.Digital Innovation</span>
           </p>
         </div>
       </div>

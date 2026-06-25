@@ -17,6 +17,7 @@ const partners = [
   "/assets/logo-rspindad.png",
   "/assets/logo-wava.png",
   "/assets/logo.png",
+  "/assets/round-mtdi.png",
 ];
 
 export default function Collaborations({dict}: CollaborationsProps) {
