@@ -93,10 +93,6 @@ export default function About({dict}: AboutProps) {
                   src={member.image}
                   alt={member.name}
                   fill
-                  // LOGIC ADJUSTMENT:
-                  // 1. member.setting.position -> Mengatur posisi wajah
-                  // 2. member.setting.zoom -> Mengatur zoom permanen
-                  // 3. group-hover:scale-xxx -> Efek zoom saat mouse diarahkan
                   className={`object-cover transition-transform duration-500 
                     ${member.setting.position} 
                     ${member.setting.zoom} 
