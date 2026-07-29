@@ -130,15 +130,16 @@ export default function DataUSGPage() {
         alert("Penuh! Kuota 25 pasien untuk hari ini sudah habis."); return;
     }
 
-    // PERBAIKAN: Tambahan .not agar mengabaikan data dummy yang kosong
-    const { data: lastAntrianData } = await supabase
-        .from("usg_reservations").select("no_antrian")
-        .eq("tanggal_reservasi", newPatient.tanggal_reservasi)
-        .not("no_antrian", "is", null)
-        .order("no_antrian", { ascending: false }).limit(1);
+    const { data: antrianData } = await supabase
+        .from("usg_reservations")
+        .select("no_antrian")
+        .eq("tanggal_reservasi", newPatient.tanggal_reservasi);
       
-    const currentMaxAntrian = (lastAntrianData && lastAntrianData.length > 0 && lastAntrianData[0].no_antrian) ? lastAntrianData[0].no_antrian : 0;
-    const nextAntrian = currentMaxAntrian + 1;
+    let nextAntrian = 1;
+    if (antrianData && antrianData.length > 0) {
+        const maxAntrian = Math.max(0, ...antrianData.map(p => Number(p.no_antrian) || 0));
+        nextAntrian = maxAntrian + 1;
+    }
 
     const { error } = await supabase.from("usg_reservations").insert([{
         ...newPatient,

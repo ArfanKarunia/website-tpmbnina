@@ -100,18 +100,18 @@ export default function ReservasiUSGPublic() {
       if (countError) throw countError;
       if (antrianCount && antrianCount.length >= 25) throw new Error("Mohon maaf, kuota (25 Pasien) untuk tanggal tersebut sudah penuh.");
       
-      const { data: lastAntrianData, error: lastAntrianError } = await supabase
+      const { data: antrianData, error: antrianError } = await supabase
         .from("usg_reservations")
         .select("no_antrian")
-        .eq("tanggal_reservasi", newPatient.tanggal_reservasi)
-        .not("no_antrian", "is", null)
-        .order("no_antrian", { ascending: false })
-        .limit(1);
+        .eq("tanggal_reservasi", newPatient.tanggal_reservasi);
       
-      if (lastAntrianError) throw lastAntrianError;
+      if (antrianError) throw antrianError;
       
-      const currentMaxAntrian = (lastAntrianData && lastAntrianData.length > 0 && lastAntrianData[0].no_antrian) ? lastAntrianData[0].no_antrian : 0;
-      const nextAntrian = currentMaxAntrian + 1;
+      let nextAntrian = 1;
+      if (antrianData && antrianData.length > 0) {
+        const maxAntrian = Math.max(0, ...antrianData.map(p => Number(p.no_antrian) || 0));
+        nextAntrian = maxAntrian + 1;
+      }
 
       const { error: insertError } = await supabase.from("usg_reservations").insert([{
           patient_name: newPatient.patient_name, umur: parseInt(newPatient.umur), nama_suami: newPatient.nama_suami,
