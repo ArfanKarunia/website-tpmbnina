@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/app/utils/supabase/client";
 import { 
   Search, Plus, Calendar, Clock, CheckCircle2, XCircle, 
-  User, Users, Phone, Activity, AlertTriangle, CalendarDays, BarChart3
+  Users, Phone, Activity, AlertTriangle, CalendarDays, BarChart3
 } from "lucide-react";
+
 
 interface USGPasien {
   id: string;
@@ -31,6 +32,7 @@ const TARIF_USG = [
 
 export default function DataUSGPage() {
   const supabase = createClient();
+  const [waStatus, setWaStatus] = useState("connect");
   const [patients, setPatients] = useState<USGPasien[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -42,6 +44,30 @@ export default function DataUSGPage() {
     patient_name: "", umur: "", nama_suami: "", alamat: "", phone: "",
     tanggal_reservasi: selectedDate, jam_reservasi: "", kehamilan_ke: "", hpht: "", jenis_usg: "", harga: 0
   });
+
+  const fetchWaStatus = async () => {
+    const { data } = await supabase
+      .from("wa_device_status")
+      .select("status")
+      .eq("id", 1)
+      .single();
+    
+    if (data) {
+      setWaStatus(data.status);
+    }
+  };
+
+  useEffect(() => {
+    fetchPatients();
+    fetchWaStatus(); 
+    setNewPatient(prev => ({ ...prev, tanggal_reservasi: selectedDate, jam_reservasi: getJamOperasional(selectedDate) }));
+    
+    // (Opsional) Polling: Mengecek status WA setiap 30 detik secara otomatis
+    const interval = setInterval(() => {
+      fetchWaStatus();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [selectedDate, activeTab]);
 
   // --- LOGIKA JAM OPERASIONAL & VALIDASI WAKTU HABIS ---
   const getJamOperasional = (dateString: string) => {
@@ -179,6 +205,22 @@ export default function DataUSGPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto">
       
+      {/* BANNER PERINGATAN WA MATI */}
+      {waStatus === "disconnect" && (
+        <div className="bg-red-600 text-white p-4 rounded-2xl shadow-lg flex items-center justify-between border-2 border-red-800 animate-pulse">
+          <div className="flex items-center gap-4">
+            <AlertTriangle size={32} />
+            <div>
+              <h3 className="font-black text-lg">DARURAT: WhatsApp Bot Terputus!</h3>
+              <p className="text-sm">Pasien tidak akan menerima pesan nomor antrian. Segera cas HP Bidan Nina atau Scan QR Ulang di Fonnte.</p>
+            </div>
+          </div>
+          <button onClick={() => window.open('https://md.fonnte.com/new/device.php', '_blank')} className="bg-white text-red-700 px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-red-50 transition">
+            Perbaiki Sekarang
+          </button>
+        </div>
+      )}
+
       {/* HEADER & FILTER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div>
