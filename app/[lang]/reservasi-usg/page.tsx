@@ -13,9 +13,6 @@ const TARIF_USG = [
   { nama: "4D (Berwarna)", harga: 250000 },
 ];
 
-// 🔴 MASUKKAN TOKEN FONNTE KAMU DI SINI 🔴
-const FONNTE_TOKEN = "Z9tf6bnLsyvC25xrPYWg"; 
-
 export default function ReservasiUSGPublic() {
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
@@ -28,7 +25,6 @@ export default function ReservasiUSGPublic() {
     tanggal_reservasi: "", jam_reservasi: "", kehamilan_ke: "", hpht: "", jenis_usg: "", harga: 0,
   });
 
-  // --- PERBAIKAN: Gunakan Zona Waktu WIB (Asia/Jakarta) untuk Tanggal Hari Ini ---
   const getTodayWIB = () => {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
   };
@@ -39,7 +35,6 @@ export default function ReservasiUSGPublic() {
   // --- LOGIKA HARI BUKA & JAM OPERASIONAL ---
   const getJamOperasional = (dateString: string) => {
     if (!dateString) return "";
-    // Pecah string tanggal untuk memastikan harinya akurat
     const [y, m, d] = dateString.split('-');
     const day = new Date(parseInt(y), parseInt(m) - 1, parseInt(d)).getDay();
 
@@ -56,10 +51,8 @@ export default function ReservasiUSGPublic() {
     const now = new Date();
     const todayISO = getTodayWIB();
 
-    // Jika yang dipilih bukan hari ini (misal besok/lusa), berarti belum habis
     if (dateString !== todayISO) return false;
 
-    // Ambil Jam dan Menit saat ini di zona WIB
     const currentHour = parseInt(now.toLocaleTimeString('en-GB', { hour: '2-digit', timeZone: 'Asia/Jakarta' }));
     const currentMinute = parseInt(now.toLocaleTimeString('en-GB', { minute: '2-digit', timeZone: 'Asia/Jakarta' }));
     const currentTime = currentHour + (currentMinute / 100); 
@@ -68,10 +61,10 @@ export default function ReservasiUSGPublic() {
     const day = new Date(parseInt(y), parseInt(m) - 1, parseInt(d)).getDay();
 
     let closingTime = 24; 
-    if (day === 2) closingTime = 17.00; // Selasa 17.00
-    if (day === 5) closingTime = 15.00; // Jumat 15.00
-    if (day === 6) closingTime = 16.00; // Sabtu 16.00
-    if (day === 0) closingTime = 17.00; // Minggu 17.00
+    if (day === 2) closingTime = 17.00; 
+    if (day === 5) closingTime = 15.00; 
+    if (day === 6) closingTime = 16.00; 
+    if (day === 0) closingTime = 17.00; 
 
     return currentTime >= closingTime;
   };
@@ -126,20 +119,41 @@ export default function ReservasiUSGPublic() {
       setNoAntrianFix(nextAntrian);
       setSuccess(true);
 
-      const waMessage = `*RESERVASI BERHASIL* ✅\n\nHalo Ibu *${newPatient.patient_name}*,\nReservasi pemeriksaan USG Anda di TPMB Nina Rahayu telah terkonfirmasi.\n\n*Jadwal:* ${new Date(newPatient.tanggal_reservasi).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}\n*Waktu:* ${newPatient.jam_reservasi}\n*Layanan:* ${newPatient.jenis_usg}\n*No. Antrian:* ${nextAntrian}\n\nMohon hadir tepat waktu dan tunjukkan pesan ini kepada petugas kami saat kedatangan.\nTerima kasih dan sehat selalu! 💖`;
+      // ==========================================
+      // 🚀 TELEGRAM NOTIFICATION SENDER (Pengganti Fonnte)
+      // ==========================================
+      const sendTelegramNotif = async () => {
+        const TELEGRAM_TOKEN = "8446632244:AAG461X_q3poobfwH872tGm4299Zp8nwzd0";
+        const CHAT_ID = "-5155147505";
+        
+        let formattedPhone = newPatient.phone;
+        if (formattedPhone.startsWith('0')) {
+          formattedPhone = '62' + formattedPhone.substring(1);
+        }
+        const waLink = `https://wa.me/${formattedPhone}`;
+        const message = `🚨 *PASIEN USG BARU MASUK* 🚨\n\n*Nama:* ${newPatient.patient_name}\n*Kontak:* [Chat WhatsApp Sekarang](${waLink})\n*Layanan:* ${newPatient.jenis_usg}\n*Jadwal:* ${new Date(newPatient.tanggal_reservasi).toLocaleDateString('id-ID')} (${newPatient.jam_reservasi})\n*No. Antrian:* ${nextAntrian}\n\n_Mohon staf bersiap di jam tersebut._`
+        
+        try {
+          await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              chat_id: CHAT_ID,
+              text: message,
+              parse_mode: "Markdown", 
+            }),
+          });
+          console.log("Notif Telegram berhasil terkirim!");
+        } catch (error) {
+          console.error("Gagal kirim Telegram:", error);
+        }
+      };
 
-      const fonnteData = new FormData();
-      fonnteData.append('target', newPatient.phone);
-      fonnteData.append('message', waMessage);
-      fonnteData.append('countryCode', '62');
-
-      fetch('https://api.fonnte.com/send', {
-        method: 'POST',
-        headers: { 'Authorization': FONNTE_TOKEN },
-        body: fonnteData
-      }).then(response => response.json())
-        .then(res => console.log("Status WA Fonnte:", res))
-        .catch(err => console.error("Gagal kirim WA:", err));
+      // Panggil fungsi kirim telegram
+      await sendTelegramNotif();
+      // ==========================================
 
     } catch (err: any) {
       setErrorMsg(err.message || "Terjadi kesalahan sistem. Silakan coba lagi nanti.");
@@ -158,7 +172,12 @@ export default function ReservasiUSGPublic() {
               <CheckCircle2 size={40} className="text-green-600" />
             </div>
             <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-2">Reservasi Berhasil!</h2>
-            <p className="text-sm md:text-base text-gray-500 mb-6">Terima kasih, <b>{newPatient.patient_name}</b>. Kami telah mengirimkan detail reservasi ini ke WhatsApp Anda.</p>
+            
+            {/* 🔥 PERUBAHAN TEKS UNTUK PASIEN AGAR SCREENSHOT */}
+            <p className="text-sm md:text-base text-gray-500 mb-6">
+              Terima kasih, <b>{newPatient.patient_name}</b>. Silakan <b>Screenshot (Simpan)</b> halaman ini sebagai bukti reservasi Anda ke klinik.
+            </p>
+            
             <div className="bg-pink-50 border-2 border-pink-100 rounded-2xl p-4 mb-6">
               <p className="text-pink-600 font-bold text-sm mb-1">NOMOR ANTRIAN ANDA</p>
               <h1 className="text-5xl font-black text-pink-500">{noAntrianFix}</h1>
@@ -264,7 +283,6 @@ export default function ReservasiUSGPublic() {
             </select>
           </div>
 
-          {/* PERBAIKAN: Tombol terkunci kalau waktu operasional sudah habis */}
           <button type="submit" disabled={loading || newPatient.tanggal_reservasi === "" || !isHariBuka(newPatient.tanggal_reservasi) || isWaktuHabis(newPatient.tanggal_reservasi)} className="w-full mt-4 md:mt-6 bg-[#ec4899] hover:bg-pink-600 text-white font-bold py-3.5 md:py-4 rounded-xl transition-all shadow-lg shadow-pink-500/30 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed text-sm md:text-base">
             {loading ? "Memproses Antrian..." : "Kirim Form Reservasi"}
           </button>
