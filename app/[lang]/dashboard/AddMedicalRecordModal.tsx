@@ -34,20 +34,17 @@ const calculateAge = (birthDateString: string) => {
   let months = today.getMonth() - birthDate.getMonth();
   let days = today.getDate() - birthDate.getDate();
 
-  // Jika hari negatif, pinjam hari dari bulan sebelumnya
   if (days < 0) {
     months--;
     const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
     days += prevMonth.getDate();
   }
 
-  // Jika bulan negatif, pinjam bulan dari tahun sebelumnya
   if (months < 0) {
     years--;
     months += 12;
   }
 
-  // LOGIKA OUTPUT UMUR
   if (years >= 1) {
     return `${years} TH`;
   } else {
@@ -60,7 +57,7 @@ const calculateAge = (birthDateString: string) => {
     }
   }
 };
-// --- LOGIKA UK & HPL KEBIDANAN (RUMUS NAEGELE) ---
+
 const calculatePregnancy = (hphtDate: string, visitDateString: string) => {
   if(!hphtDate) return { uk: "", hpl: "" };
 
@@ -70,15 +67,11 @@ const calculatePregnancy = (hphtDate: string, visitDateString: string) => {
   hpht.setHours(0, 0, 0, 0);
   visitDate.setHours(0, 0, 0, 0);
 
-  // 1. HITUNG HPL DENGAN RUMUS NAEGELE 
-  // (Hari + 7) lalu (Bulan + 9, Tahun tetap) ATAU (Bulan - 3, Tahun + 1)
   const hplDate = new Date(hpht);
   
   if (hplDate.getMonth() <= 2) { 
-    // Jika HPHT Jan, Feb, Mar (Index 0, 1, 2)
     hplDate.setMonth(hplDate.getMonth() + 9);
   } else {
-    // Jika HPHT April - Des
     hplDate.setMonth(hplDate.getMonth() - 3);
     hplDate.setFullYear(hplDate.getFullYear() + 1);
   }
@@ -87,7 +80,6 @@ const calculatePregnancy = (hphtDate: string, visitDateString: string) => {
   
   const hplString = hplDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  // 2. HITUNG USIA KEHAMILAN (UK) BERDASARKAN TGL PERIKSA
   const diffTime = visitDate.getTime() - hpht.getTime();
   
   if (diffTime < 0) {
@@ -100,7 +92,6 @@ const calculatePregnancy = (hphtDate: string, visitDateString: string) => {
 
   let ukString = `${weeks} Minggu ${days} Hari`;
 
-  // Warning jika kehamilan lewat waktu (Post-term > 42 minggu)
   if (weeks > 42) {
     ukString += " ⚠️ (Lewat HPL)";
   }
@@ -128,6 +119,8 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
   const [visitCount, setVisitCount] = useState<number>(0); 
   const [isOldPatient, setIsOldPatient] = useState(false);
 
+  const [visitCategory, setVisitCategory] = useState("Umum (BP)");
+
   const [isAncMode, setIsAncMode] = useState(false);
   const [ancData, setAncData] = useState({ husband_name: "", hpht: "", gravida: "", usg_type: "2D", leopold1: "", leopold2: "", leopold3: "", leopold4: "", djj: "" });
   const [calcResult, setCalcResult] = useState({ uk: "", hpl: "" });
@@ -148,10 +141,10 @@ useEffect(() => {
     setCalcResult(calculatePregnancy(ancData.hpht, formData.visit_date)); 
   }
 }, [ancData.hpht, formData.visit_date]);
+
   useEffect(() => {
     if (isOpen) {
       const initData = async () => {
-        // 1. Fetch Master Medicines
         const { data: medData } = await supabase.from("medicines").select("*").order("name");
         setMedicines(medData || []);
 
@@ -169,6 +162,7 @@ useEffect(() => {
           });
           setPatientQuery(recordToEdit.patient_name || ""); 
           checkPatientHistory(recordToEdit.patient_id); 
+          setVisitCategory("Umum (BP)"); // Reset ke default untuk edit jika tidak disimpan di medical_records
 
           if(recordToEdit.diagnosis.toLowerCase().includes('hamil') || recordToEdit.diagnosis.toLowerCase().includes('anc') || recordToEdit.action.includes('[ANC Data]')) {
                setIsAncMode(true);
@@ -201,6 +195,7 @@ useEffect(() => {
           setAncData({ husband_name: "", hpht: "", gravida: "", usg_type: "2D", leopold1: "", leopold2: "", leopold3: "", leopold4: "", djj: "" });
           setCalcResult({ uk: "", hpl: "" });
           setIsAncMode(false); setPatientQuery(""); setSelectedMedicines([]); setOldMedicineTrack([]); setVisitCount(0); setIsOldPatient(false); setMedicineLoadError(false);
+          setVisitCategory("Umum (BP)");
         }
       };
       initData();
@@ -292,23 +287,16 @@ useEffect(() => {
 
       if (recordToEdit) {
          // --- UPDATE MODE ---
-         
-         // 1. REVERT STOK LAMA
          const { data: oldItems } = await supabase.from('visit_items').select('*').eq('visit_id', recordId);
          if (oldItems && oldItems.length > 0) {
              for (const item of oldItems) {
-                 // AMBIL STOK FRESH DARI DB (Jangan pakai state)
                  const { data: med } = await supabase.from('medicines').select('stock').eq('id', item.item_id).single();
                  if (med) await supabase.from('medicines').update({ stock: med.stock + item.qty }).eq('id', item.item_id);
              }
-             // Hapus visit_items lama
              await supabase.from('visit_items').delete().eq('visit_id', recordId);
          }
          
-         // 2. UPDATE RECORD UTAMA
          await supabase.from("medical_records").update(payload).eq("id", recordToEdit.id);
-         
-         // 3. SYNC TRANSAKSI (Hapus Lama)
          await supabase.from("transactions").delete().eq("visit_id", recordId);
 
       } else {
@@ -318,12 +306,12 @@ useEffect(() => {
          recordId = newRec.id;
       }
 
-      // --- 4. INSERT TRANSAKSI (Berlaku untuk Baru & Edit) ---
+      // --- 4. INSERT TRANSAKSI DENGAN LABEL KATEGORI BARU ---
       const transactionsPayload = [];
       if (formData.service_fee > 0) {
           transactionsPayload.push({ 
             date: formData.visit_date, 
-            description: `Jasa: ${selectedPatient?.name} (${isAncMode ? 'ANC' : 'Umum'})`, 
+            description: `Jasa: ${selectedPatient?.name} (${visitCategory})`, // 🔥 Label Kategori Tersambung
             category: "Layanan Medis", type: "in", amount: formData.service_fee, quantity: 1,
             visit_id: recordId 
           });
@@ -331,7 +319,7 @@ useEffect(() => {
       if (medicineTotal > 0) {
           transactionsPayload.push({ 
             date: formData.visit_date, 
-            description: `Obat: ${selectedPatient?.name}`, 
+            description: `Obat: ${selectedPatient?.name} (${visitCategory})`, // 🔥 Label Kategori Tersambung
             category: "Obat & Vitamin", type: "in", amount: medicineTotal, quantity: 1,
             visit_id: recordId 
           });
@@ -349,11 +337,8 @@ useEffect(() => {
           
           await supabase.from('visit_items').insert(itemsPayload);
 
-          // Kurangi Stok Baru (PAKAI DATA STOK FRESH LAGI BIAR AMAN)
           for (const item of selectedMedicines) {
-              // Fetch ulang stok terkini dari DB (karena mungkin sudah berubah di langkah Revert tadi)
               const { data: freshMed } = await supabase.from('medicines').select('stock').eq('id', item.id).single();
-              
               if (freshMed) {
                   await supabase.from("medicines").update({ stock: freshMed.stock - item.qty }).eq("id", item.id);
               }
@@ -384,9 +369,11 @@ useEffect(() => {
             {/* CONTENT */}
             <div className="overflow-y-auto p-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* SEARCH PASIEN */}
+                  {/* SEARCH PASIEN, KATEGORI & TANGGAL */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="relative">
+                    
+                    {/* BARIS 1: Cari Pasien (Lebar Penuh) */}
+                    <div className="relative md:col-span-2">
                         <div className="flex justify-between items-center mb-1">
                             <label className="text-xs font-bold text-gray-500 uppercase">Cari Pasien</label>
                             {formData.patient_id && (<span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 ${isOldPatient ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{isOldPatient ? <UserCheck size={10}/> : <UserPlus size={10}/>} {isOldPatient ? `Pasien Lama (Ke-${visitCount})` : "Pasien Baru"}</span>)}
@@ -404,7 +391,21 @@ useEffect(() => {
                             </div>
                         )}
                     </div>
-                    <div><label className="text-xs font-bold text-gray-500 uppercase mb-1">Tanggal</label><input type="date" required className="w-full p-2 border rounded-xl" value={formData.visit_date} onChange={(e) => setFormData({...formData, visit_date: e.target.value})} /></div>
+
+                    {/* BARIS 2: Kategori & Tanggal (Dibagi 2 kolom) */}
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase mb-1">Kategori Kunjungan</label>
+                        <select required className="w-full p-2 border rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none" value={visitCategory} onChange={(e) => setVisitCategory(e.target.value)}>
+                            <option value="Umum (BP)">Umum (BP)</option>
+                            <option value="KIA - BPJS">KIA - BPJS</option>
+                            <option value="KIA - Non BPJS">KIA - Non BPJS</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase mb-1">Tanggal</label>
+                        <input type="date" required className="w-full p-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" value={formData.visit_date} onChange={(e) => setFormData({...formData, visit_date: e.target.value})} />
+                    </div>
+
                   </div>
 
                   {/* TANDA VITAL */}
@@ -434,7 +435,7 @@ useEffect(() => {
                                   <p className={`text-xs font-bold ${parseInt(calcResult.uk) > 42 ? 'text-red-600' : 'text-pink-600'}`}>
                                     UK: {calcResult.uk} • HPL: {calcResult.hpl}
                                   </p>
-                                                                
+                                                                                        
                                   {/* TOMBOL RESET JIKA DATA SUDAH LAMA / LEBIH DARI 42 MINGGU */}
                                   {parseInt(calcResult.uk) > 42 && (
                                     <button
