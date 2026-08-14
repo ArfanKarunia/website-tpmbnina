@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/app/utils/supabase/client";
-import { User, Phone, Calendar, CheckCircle2, AlertCircle, Activity, MapPin, Heart, Baby, Clock } from "lucide-react";
+import { User, Phone, Calendar, CheckCircle2, AlertCircle, Activity, MapPin, Heart, Baby, Clock, Stethoscope } from "lucide-react";
 
 const TARIF_USG = [
   { nama: "2D (Hitam Putih)", harga: 100000 },
@@ -23,6 +23,7 @@ export default function ReservasiUSGPublic() {
   const [noAntrianFix, setNoAntrianFix] = useState(0); 
   
   const [newPatient, setNewPatient] = useState({
+    kode_referensi: "", 
     patient_name: "", umur: "", nama_suami: "", alamat: "", phone: "",
     tanggal_reservasi: "", jam_reservasi: "", kehamilan_ke: "", hpht: "", jenis_usg: "", harga: 0,
   });
@@ -108,7 +109,9 @@ export default function ReservasiUSGPublic() {
         nextAntrian = maxAntrian + 1;
       }
 
+      // 🔥 SIMPAN KODE REFERENSI KE DATABASE
       const { error: insertError } = await supabase.from("usg_reservations").insert([{
+          kode_referensi: newPatient.kode_referensi ? newPatient.kode_referensi.toUpperCase() : null,
           patient_name: newPatient.patient_name, umur: parseInt(newPatient.umur), nama_suami: newPatient.nama_suami,
           alamat: newPatient.alamat, phone: newPatient.phone, tanggal_reservasi: newPatient.tanggal_reservasi,
           jam_reservasi: newPatient.jam_reservasi, kehamilan_ke: parseInt(newPatient.kehamilan_ke),
@@ -122,7 +125,7 @@ export default function ReservasiUSGPublic() {
       setSuccess(true);
 
       // ==========================================
-      // 🚀 TELEGRAM NOTIFICATION SENDER (Pengganti Fonnte)
+      // 🚀 TELEGRAM NOTIFICATION SENDER 
       // ==========================================
       const sendTelegramNotif = async () => {
         const TELEGRAM_TOKEN = "8446632244:AAG461X_q3poobfwH872tGm4299Zp8nwzd0";
@@ -133,7 +136,10 @@ export default function ReservasiUSGPublic() {
           formattedPhone = '62' + formattedPhone.substring(1);
         }
         const waLink = `https://wa.me/${formattedPhone}`;
-        const message = `🚨 *PASIEN USG BARU MASUK* 🚨\n\n*Nama:* ${newPatient.patient_name}\n*Kontak:* [Chat WhatsApp Sekarang](${waLink})\n*Layanan:* ${newPatient.jenis_usg}\n*Jadwal:* ${new Date(newPatient.tanggal_reservasi).toLocaleDateString('id-ID')} (${newPatient.jam_reservasi})\n*No. Antrian:* ${nextAntrian}\n\n_Mohon staf bersiap di jam tersebut._`
+        
+        // 🔥 Tambahkan Kode Referensi di Notif Telegram (jika ada)
+        const refText = newPatient.kode_referensi ? `\n*Referensi:* ${newPatient.kode_referensi.toUpperCase()}` : '';
+        const message = `🚨 *PASIEN USG BARU MASUK* 🚨${refText}\n\n*Nama:* ${newPatient.patient_name}\n*Kontak:* [Chat WhatsApp Sekarang](${waLink})\n*Layanan:* ${newPatient.jenis_usg}\n*Jadwal:* ${new Date(newPatient.tanggal_reservasi).toLocaleDateString('id-ID')} (${newPatient.jam_reservasi})\n*No. Antrian:* ${nextAntrian}\n\n_Mohon staf bersiap di jam tersebut._`
         
         try {
           await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
@@ -153,7 +159,6 @@ export default function ReservasiUSGPublic() {
         }
       };
 
-      // Panggil fungsi kirim telegram
       await sendTelegramNotif();
       // ==========================================
 
@@ -175,7 +180,6 @@ export default function ReservasiUSGPublic() {
             </div>
             <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-2">Reservasi Berhasil!</h2>
             
-            {/* 🔥 PERUBAHAN TEKS UNTUK PASIEN AGAR SCREENSHOT */}
             <p className="text-sm md:text-base text-gray-500 mb-6">
               Terima kasih, <b>{newPatient.patient_name}</b>. Silakan <b>Screenshot (Simpan)</b> halaman ini sebagai bukti reservasi Anda ke klinik.
             </p>
@@ -197,11 +201,35 @@ export default function ReservasiUSGPublic() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-pink-50/50 p-4 font-sans py-8 md:py-12">
-      <div className="bg-white w-full max-w-2xl p-5 md:p-8 rounded-3xl shadow-xl border border-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-pink-50/50 p-4 font-sans py-8 md:py-12 relative overflow-hidden">
+      
+      {/* Background Ornament */}
+      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-pink-200 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob animation-delay-2000"></div>
+
+      <div className="bg-white w-full max-w-2xl p-5 md:p-8 rounded-3xl shadow-xl border border-white/50 backdrop-blur-sm relative z-10">
         
-        <div className="text-center mb-6 md:mb-8 pb-5 md:pb-6 border-b border-gray-100">
-          <div className="w-14 h-14 md:w-16 md:h-16 bg-pink-100 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4"><Activity size={28} className="text-pink-600" /></div>
+        <div className="text-center mb-6 md:mb-8 pb-5 md:pb-6 border-b border-gray-100 relative">
+          
+          {/* 🔥 FORM KODE REFERENSI (Diposisikan elegan di pojok Kiri Atas area Form) */}
+          <div className="absolute -top-2 left-0 md:-left-2 z-20">
+            <div className="group relative flex items-center">
+              <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl blur opacity-25 group-focus-within:opacity-50 transition duration-500"></div>
+              <div className="relative flex items-center bg-white border border-gray-200 rounded-lg shadow-sm px-2 py-1 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
+                <Stethoscope size={14} className="text-blue-500 ml-1 mr-2 shrink-0"/>
+                <input 
+                  type="text" 
+                  maxLength={10}
+                  value={newPatient.kode_referensi} 
+                  onChange={(e) => setNewPatient({...newPatient, kode_referensi: e.target.value})} 
+                  className="w-24 md:w-32 bg-transparent text-xs md:text-sm font-bold text-gray-700 outline-none uppercase placeholder:normal-case placeholder:font-normal placeholder:text-gray-400" 
+                  placeholder="Kode Rujukan" 
+                />
+              </div>
+            </div>
+          </div>
+          
+          <div className="w-14 h-14 md:w-16 md:h-16 bg-pink-100 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 mt-6 md:mt-0"><Activity size={28} className="text-pink-600" /></div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-800">Form Reservasi USG</h1>
           <p className="text-gray-500 text-xs md:text-sm mt-1 md:mt-2">Klinik TPMB Nina Rahayu</p>
         </div>
@@ -219,12 +247,10 @@ export default function ReservasiUSGPublic() {
                 <input type="date" required min={minDate} value={newPatient.tanggal_reservasi} onChange={handleDateChange} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-gray-700 text-sm md:text-base appearance-none" />
               </div>
               
-              {/* PESAN PERINGATAN BUKAN HARI BUKA */}
               {newPatient.tanggal_reservasi && !isHariBuka(newPatient.tanggal_reservasi) && (
                 <p className="text-xs text-red-500 mt-2 font-medium">⚠️ Tanggal ini bukan jadwal buka USG.</p>
               )}
               
-              {/* PESAN PERINGATAN JAM HABIS DI FORM PUBLIK */}
               {newPatient.tanggal_reservasi && isHariBuka(newPatient.tanggal_reservasi) && isWaktuHabis(newPatient.tanggal_reservasi) && (
                 <p className="text-xs text-red-500 mt-2 font-bold">⚠️ Mohon maaf, waktu pendaftaran untuk hari ini sudah ditutup.</p>
               )}
