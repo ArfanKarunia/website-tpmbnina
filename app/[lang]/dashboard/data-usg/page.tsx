@@ -4,14 +4,18 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/app/utils/supabase/client";
 import { 
   Search, Plus, Calendar, Clock, CheckCircle2, XCircle, 
-  Users, Phone, Activity, AlertTriangle, CalendarDays, BarChart3
+  Users, Phone, Activity, AlertTriangle, CalendarDays, BarChart3, Pencil
 } from "lucide-react";
-
 
 interface USGPasien {
   id: string;
   patient_name: string;
+  umur: number;
+  nama_suami: string;
+  alamat: string;
   phone: string;
+  kehamilan_ke: number;
+  hpht: string;
   jenis_usg: string;
   harga: number;
   tanggal_reservasi: string;
@@ -24,6 +28,8 @@ interface USGPasien {
 const TARIF_USG = [
   { nama: "2D (Hitam Putih)", harga: 100000 },
   { nama: "2D (Berwarna)", harga: 120000 },
+  { nama: "Cek IUD", harga: 120000 },
+  { nama: "Kesehatan Produksi", harga: 120000 },
   { nama: "3D (Hitam Putih)", harga: 150000 },
   { nama: "3D (Berwarna)", harga: 180000 },
   { nama: "4D (Hitam Putih)", harga: 220000 },
@@ -32,7 +38,6 @@ const TARIF_USG = [
 
 export default function DataUSGPage() {
   const supabase = createClient();
-  const [waStatus, setWaStatus] = useState("connect");
   const [patients, setPatients] = useState<USGPasien[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -40,34 +45,12 @@ export default function DataUSGPage() {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]); 
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null); // State untuk mode Edit
+  
   const [newPatient, setNewPatient] = useState({
     patient_name: "", umur: "", nama_suami: "", alamat: "", phone: "",
     tanggal_reservasi: selectedDate, jam_reservasi: "", kehamilan_ke: "", hpht: "", jenis_usg: "", harga: 0
   });
-
-  const fetchWaStatus = async () => {
-    const { data } = await supabase
-      .from("wa_device_status")
-      .select("status")
-      .eq("id", 1)
-      .single();
-    
-    if (data) {
-      setWaStatus(data.status);
-    }
-  };
-
-  useEffect(() => {
-    fetchPatients();
-    fetchWaStatus(); 
-    setNewPatient(prev => ({ ...prev, tanggal_reservasi: selectedDate, jam_reservasi: getJamOperasional(selectedDate) }));
-    
-    // (Opsional) Polling: Mengecek status WA setiap 30 detik secara otomatis
-    const interval = setInterval(() => {
-      fetchWaStatus();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [selectedDate, activeTab]);
 
   // --- LOGIKA JAM OPERASIONAL & VALIDASI WAKTU HABIS ---
   const getJamOperasional = (dateString: string) => {
@@ -140,49 +123,127 @@ export default function DataUSGPage() {
     if (!error) fetchPatients(); 
   };
 
-  const handleAddPatient = async (e: React.FormEvent) => {
+  // BUKA MODAL UNTUK EDIT
+  const handleEditClick = (patient: USGPasien) => {
+    setEditingId(patient.id);
+    setNewPatient({
+      patient_name: patient.patient_name,
+      umur: patient.umur?.toString() || "",
+      nama_suami: patient.nama_suami || "",
+      alamat: patient.alamat || "",
+      phone: patient.phone || "",
+      tanggal_reservasi: patient.tanggal_reservasi,
+      jam_reservasi: patient.jam_reservasi,
+      kehamilan_ke: patient.kehamilan_ke?.toString() || "",
+      hpht: patient.hpht || "",
+      jenis_usg: patient.jenis_usg,
+      harga: patient.harga
+    });
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setNewPatient({ 
+      patient_name: "", umur: "", nama_suami: "", alamat: "", phone: "",
+      tanggal_reservasi: selectedDate, jam_reservasi: getJamOperasional(selectedDate), kehamilan_ke: "", hpht: "", jenis_usg: "", harga: 0 
+    });
+  };
+
+  // SUBMIT (TAMBAH BARU ATAU UPDATE)
+  const handleSubmitPatient = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!isHariBuka(newPatient.tanggal_reservasi)) {
-        alert("Pendaftaran gagal! Hari yang dipilih bukan jadwal USG."); return;
+        alert("Gagal! Hari yang dipilih bukan jadwal USG."); return;
     }
 
-    if (isWaktuHabis(newPatient.tanggal_reservasi)) {
+    // Jika buat baru dan jam sudah lewat
+    if (!editingId && isWaktuHabis(newPatient.tanggal_reservasi)) {
         alert("Pendaftaran ditolak! Jam operasional USG untuk hari ini sudah berakhir. Silakan pilih hari lain."); return;
     }
 
-    const antrianHariItu = patients.filter(p => p.tanggal_reservasi === newPatient.tanggal_reservasi && p.status !== 'batal');
-    if (antrianHariItu.length >= 25) {
-        alert("Penuh! Kuota 25 pasien untuk hari ini sudah habis."); return;
-    }
+    if (editingId) {
+      // --- LOGIKA UPDATE DATA ---
+      const originalPatient = patients.find(p => p.id === editingId);
+      let antrianToSave = originalPatient?.no_antrian;
 
-    const { data: antrianData } = await supabase
-        .from("usg_reservations")
-        .select("no_antrian")
-        .eq("tanggal_reservasi", newPatient.tanggal_reservasi);
-      
-    let nextAntrian = 1;
-    if (antrianData && antrianData.length > 0) {
-        const maxAntrian = Math.max(0, ...antrianData.map(p => Number(p.no_antrian) || 0));
-        nextAntrian = maxAntrian + 1;
-    }
+      // Jika staf mengubah tanggal saat edit, hitung ulang antrian di tanggal baru
+      if (originalPatient?.tanggal_reservasi !== newPatient.tanggal_reservasi) {
+        const { data: antrianData } = await supabase
+          .from("usg_reservations")
+          .select("no_antrian")
+          .eq("tanggal_reservasi", newPatient.tanggal_reservasi)
+          .neq("status", "batal");
 
-    const { error } = await supabase.from("usg_reservations").insert([{
-        ...newPatient,
+        if (antrianData && antrianData.length >= 25) {
+            alert("Penuh! Kuota 25 pasien untuk tanggal tersebut sudah habis."); return;
+        }
+
+        let nextAntrian = 1;
+        if (antrianData && antrianData.length > 0) {
+            const maxAntrian = Math.max(0, ...antrianData.map(p => Number(p.no_antrian) || 0));
+            nextAntrian = maxAntrian + 1;
+        }
+        antrianToSave = nextAntrian;
+      }
+
+      const { error } = await supabase.from("usg_reservations").update({
+        patient_name: newPatient.patient_name,
         umur: parseInt(newPatient.umur),
+        nama_suami: newPatient.nama_suami,
+        alamat: newPatient.alamat,
+        phone: newPatient.phone,
+        tanggal_reservasi: newPatient.tanggal_reservasi,
+        jam_reservasi: newPatient.jam_reservasi,
         kehamilan_ke: parseInt(newPatient.kehamilan_ke),
         hpht: newPatient.hpht ? newPatient.hpht : null,
-        no_antrian: nextAntrian,
-        status: "menunggu"
-    }]);
+        jenis_usg: newPatient.jenis_usg,
+        harga: newPatient.harga,
+        no_antrian: antrianToSave
+      }).eq("id", editingId);
 
-    if (!error) {
-        setIsModalOpen(false);
-        setNewPatient({ 
-          patient_name: "", umur: "", nama_suami: "", alamat: "", phone: "",
-          tanggal_reservasi: selectedDate, jam_reservasi: getJamOperasional(selectedDate), kehamilan_ke: "", hpht: "", jenis_usg: "", harga: 0 
-        });
-        fetchPatients();
+      if (!error) {
+          closeModal();
+          fetchPatients();
+      } else {
+          alert("Gagal memperbarui data: " + error.message);
+      }
+
+    } else {
+      // --- LOGIKA INSERT DATA BARU ---
+      const antrianHariItu = patients.filter(p => p.tanggal_reservasi === newPatient.tanggal_reservasi && p.status !== 'batal');
+      if (antrianHariItu.length >= 25) {
+          alert("Penuh! Kuota 25 pasien untuk hari ini sudah habis."); return;
+      }
+
+      const { data: antrianData } = await supabase
+          .from("usg_reservations")
+          .select("no_antrian")
+          .eq("tanggal_reservasi", newPatient.tanggal_reservasi);
+        
+      let nextAntrian = 1;
+      if (antrianData && antrianData.length > 0) {
+          const maxAntrian = Math.max(0, ...antrianData.map(p => Number(p.no_antrian) || 0));
+          nextAntrian = maxAntrian + 1;
+      }
+
+      const { error } = await supabase.from("usg_reservations").insert([{
+          ...newPatient,
+          umur: parseInt(newPatient.umur),
+          kehamilan_ke: parseInt(newPatient.kehamilan_ke),
+          hpht: newPatient.hpht ? newPatient.hpht : null,
+          no_antrian: nextAntrian,
+          status: "menunggu"
+      }]);
+
+      if (!error) {
+          closeModal();
+          fetchPatients();
+      } else {
+          alert("Gagal menambahkan data: " + error.message);
+      }
     }
   };
 
@@ -205,22 +266,6 @@ export default function DataUSGPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto">
       
-      {/* BANNER PERINGATAN WA MATI */}
-      {waStatus === "disconnect" && (
-        <div className="bg-red-600 text-white p-4 rounded-2xl shadow-lg flex items-center justify-between border-2 border-red-800 animate-pulse">
-          <div className="flex items-center gap-4">
-            <AlertTriangle size={32} />
-            <div>
-              <h3 className="font-black text-lg">DARURAT: WhatsApp Bot Terputus!</h3>
-              <p className="text-sm">Pasien tidak akan menerima pesan nomor antrian. Segera cas HP Bidan Nina atau Scan QR Ulang di Fonnte.</p>
-            </div>
-          </div>
-          <button onClick={() => window.open('https://md.fonnte.com/new/device.php', '_blank')} className="bg-white text-red-700 px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-red-50 transition">
-            Perbaiki Sekarang
-          </button>
-        </div>
-      )}
-
       {/* HEADER & FILTER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div>
@@ -240,7 +285,7 @@ export default function DataUSGPage() {
          <span className="text-sm font-bold text-gray-600">Pilih Waktu:</span>
          <input type={activeTab === "harian" ? "date" : "month"} value={activeTab === "harian" ? selectedDate : selectedDate.substring(0, 7)} onChange={(e) => setSelectedDate(activeTab === "harian" ? e.target.value : `${e.target.value}-01`)} className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 font-medium text-gray-700" />
           {activeTab === "harian" && hariIniBuka && (
-            <button onClick={() => setIsModalOpen(true)} className="ml-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md shadow-blue-500/20"><Plus size={18} /> Pasien Go-Show</button>
+            <button onClick={() => { setEditingId(null); setIsModalOpen(true); }} className="ml-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md shadow-blue-500/20"><Plus size={18} /> Pasien Go-Show</button>
           )}
       </div>
 
@@ -251,7 +296,7 @@ export default function DataUSGPage() {
       {/* --- TABEL ANTRIAN HARIAN --- */}
       {activeTab === "harian" && (
         <>
-          {/* INDIKATOR KUOTA & STATUS DIKEMBALIKAN */}
+          {/* INDIKATOR KUOTA & STATUS */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-2">
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><Users size={24}/></div>
@@ -316,6 +361,8 @@ export default function DataUSGPage() {
                         <td className="p-4 pr-6">
                           {patient.status === 'menunggu' && (
                             <div className="flex justify-end gap-2">
+                              {/* TOMBOL EDIT DITAMBAHKAN DI SINI */}
+                              <button onClick={() => handleEditClick(patient)} className="p-2.5 bg-white border border-gray-200 text-blue-600 hover:bg-blue-500 hover:text-white hover:border-blue-500 rounded-xl transition-all shadow-sm" title="Edit Data"><Pencil size={20} /></button>
                               <button onClick={() => updateStatus(patient.id, 'selesai')} className="p-2.5 bg-white border border-gray-200 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 rounded-xl transition-all shadow-sm" title="Tandai Selesai"><CheckCircle2 size={20} /></button>
                               <button onClick={() => updateStatus(patient.id, 'batal')} className="p-2.5 bg-white border border-gray-200 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 rounded-xl transition-all shadow-sm" title="Batalkan"><XCircle size={20} /></button>
                             </div>
@@ -360,20 +407,23 @@ export default function DataUSGPage() {
         </div>
       )}
 
-      {/* --- MODAL INPUT MANUAL (GO-SHOW) --- */}
+      {/* --- MODAL INPUT & EDIT MANUAL --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
            <div className="bg-white rounded-3xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <button onClick={() => setIsModalOpen(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"><XCircle size={24}/></button>
-            <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2"><Activity className="text-pink-500"/> Input Pasien Manual</h2>
+            <button onClick={closeModal} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"><XCircle size={24}/></button>
             
-            <form onSubmit={handleAddPatient} className="space-y-4">
+            {/* Judul Modal Dinamis */}
+            <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+              <Activity className="text-pink-500"/> {editingId ? "Edit Data Pasien" : "Input Pasien Manual"}
+            </h2>
+            
+            <form onSubmit={handleSubmitPatient} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Tanggal Reservasi</label>
                   <input type="date" required value={newPatient.tanggal_reservasi} onChange={handleDateChange} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500" />
-                  {/* PESAN PERINGATAN WAKTU HABIS DI FORM */}
-                  {newPatient.tanggal_reservasi && isWaktuHabis(newPatient.tanggal_reservasi) && (
+                  {!editingId && newPatient.tanggal_reservasi && isWaktuHabis(newPatient.tanggal_reservasi) && (
                     <p className="text-xs text-red-500 mt-2 font-bold">⚠️ Jam operasional hari ini telah lewat.</p>
                   )}
                 </div>
@@ -433,8 +483,11 @@ export default function DataUSGPage() {
               </div>
 
               <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-3 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl font-bold transition-all">Batal</button>
-                <button type="submit" className="flex-1 px-4 py-3 bg-pink-500 hover:bg-pink-600 text-white rounded-xl font-bold transition-all shadow-lg shadow-pink-500/30">Simpan Pasien Go-Show</button>
+                <button type="button" onClick={closeModal} className="flex-1 px-4 py-3 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl font-bold transition-all">Batal</button>
+                {/* Teks Tombol Submit Dinamis */}
+                <button type="submit" className="flex-1 px-4 py-3 bg-pink-500 hover:bg-pink-600 text-white rounded-xl font-bold transition-all shadow-lg shadow-pink-500/30">
+                  {editingId ? "Simpan Perubahan" : "Simpan Pasien Go-Show"}
+                </button>
               </div>
             </form>
           </div>

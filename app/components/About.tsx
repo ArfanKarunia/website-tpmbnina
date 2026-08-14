@@ -75,7 +75,7 @@ export default function About({dict}: AboutProps) {
             />
           </div>
           <h3 className="text-xl md:text-2xl font-bold text-gray-900">
-            Nina Rahayu, S.Tr.Keb
+            Bd. Nina Rahayu, S.Tr.Keb
           </h3>
           <p className="text-pmb-pink font-medium mt-1">
             {dict.lead_role}

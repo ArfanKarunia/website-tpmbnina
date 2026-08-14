@@ -7,6 +7,8 @@ import { User, Phone, Calendar, CheckCircle2, AlertCircle, Activity, MapPin, Hea
 const TARIF_USG = [
   { nama: "2D (Hitam Putih)", harga: 100000 },
   { nama: "2D (Berwarna)", harga: 120000 },
+  { nama: "Cek IUD", harga: 120000 },
+  { nama: "Kesehatan Produksi", harga: 120000 },
   { nama: "3D (Hitam Putih)", harga: 150000 },
   { nama: "3D (Berwarna)", harga: 180000 },
   { nama: "4D (Hitam Putih)", harga: 220000 },
