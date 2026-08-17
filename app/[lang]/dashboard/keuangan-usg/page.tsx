@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/app/utils/supabase/client";
 import { 
   DollarSign, PieChart, Activity, Stethoscope, Wallet, Users, 
-  Banknote, Calendar, ArrowLeft, BarChart3
+  Banknote, Calendar, ArrowLeft, BarChart3, Link as LinkIcon
 } from "lucide-react";
 import Link from "next/link";
 
@@ -19,6 +19,7 @@ export default function KeuanganUSGPage() {
   const [totalPendapatan, setTotalPendapatan] = useState(0);
   const [totalPasien, setTotalPasien] = useState(0);
   const [rekapMingguan, setRekapMingguan] = useState({ m1: 0, m2: 0, m3: 0, m4: 0 });
+  const [rekapKader, setRekapKader] = useState<Record<string, { jumlah: number; nominal: number }>>({}); 
 
   // --- LOGIKA FETCH DATA DARI SUPABASE ---
   useEffect(() => {
@@ -31,10 +32,9 @@ export default function KeuanganUSGPage() {
       const lastDay = new Date(year, month, 0).getDate();
       const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
 
-      // Ambil data bulan terpilih HANYA yang statusnya 'selesai'
       const { data, error } = await supabase
         .from("usg_reservations")
-        .select("harga, tanggal_reservasi")
+        .select("harga, tanggal_reservasi, kode_referensi")
         .gte("tanggal_reservasi", startDate)
         .lte("tanggal_reservasi", endDate)
         .eq("status", "selesai");
@@ -42,21 +42,31 @@ export default function KeuanganUSGPage() {
       if (!error && data) {
         let total = 0;
         let m1 = 0, m2 = 0, m3 = 0, m4 = 0;
+        const tempRekapKader: Record<string, { jumlah: number; nominal: number }> = {};
 
         data.forEach(p => {
           total += p.harga;
-          const day = parseInt(p.tanggal_reservasi.split("-")[2]); // Ambil tanggal
+          const day = parseInt(p.tanggal_reservasi.split("-")[2]); 
 
           // Pisahkan ke minggu 1 - 4
           if (day <= 7) m1 += p.harga;
           else if (day <= 14) m2 += p.harga;
           else if (day <= 21) m3 += p.harga;
           else m4 += p.harga;
+
+          // Logika Hitung Referensi Kader
+          if (p.kode_referensi) {
+            const kode = p.kode_referensi.toUpperCase();
+            if (!tempRekapKader[kode]) tempRekapKader[kode] = { jumlah: 0, nominal: 0 };
+            tempRekapKader[kode].jumlah += 1;
+            tempRekapKader[kode].nominal += p.harga; // Tetap disimpan kalau sewaktu-waktu butuh data omzet
+          }
         });
 
         setTotalPendapatan(total);
         setTotalPasien(data.length);
         setRekapMingguan({ m1, m2, m3, m4 });
+        setRekapKader(tempRekapKader);
       }
       
       setLoading(false);
@@ -186,7 +196,7 @@ export default function KeuanganUSGPage() {
             </div>
           </div>
 
-          {/* REKAP MINGGU 1 - 4 (SAMA SEPERTI DI DATA USG) */}
+          {/* REKAP MINGGU 1 - 4 */}
           <div className="mt-10">
             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
               <BarChart3 size={20} className="text-gray-400" /> Detail Pemasukan per Minggu
@@ -210,6 +220,51 @@ export default function KeuanganUSGPage() {
               </div>
             </div>
           </div>
+
+          {/* 🔥 REKAP KINERJA KADER/RUJUKAN */}
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mt-10">
+            <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <LinkIcon className="text-blue-500" size={20} /> Rekapitulasi Komisi Kader (Bulan Ini)
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">Laporan jumlah pasien selesai dan perhitungan komisi <b>(Rp 10.000 / pasien)</b> untuk masing-masing kode kader.</p>
+            </div>
+            
+            {Object.keys(rekapKader).length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                      <th className="p-4 pl-6 font-bold">Kode Referensi</th>
+                      <th className="p-4 text-center font-bold">Jumlah Pasien Selesai</th>
+                      <th className="p-4 pr-6 text-right font-bold">Total Komisi Kader</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {Object.entries(rekapKader)
+                      .sort((a, b) => b[1].jumlah - a[1].jumlah) // Urutkan dari pasien terbanyak
+                      .map(([kode, data]) => {
+                        const totalKomisi = data.jumlah * 10000; // 🔥 Hitung komisi otomatis Rp 10.000
+                        return (
+                          <tr key={kode} className="hover:bg-blue-50/50 transition-colors">
+                            <td className="p-4 pl-6 font-black text-blue-600">{kode}</td>
+                            <td className="p-4 text-center font-bold text-gray-700">{data.jumlah} Orang</td>
+                            {/* Menampilkan total komisi warna hijau */}
+                            <td className="p-4 pr-6 text-right font-black text-green-600">{formatRupiah(totalKomisi)}</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-10 text-center text-gray-400">
+                <Users size={32} className="mx-auto mb-2 opacity-20" />
+                <p className="italic">Belum ada pasien yang menggunakan kode rujukan bulan ini.</p>
+              </div>
+            )}
+          </div>
+
         </>
       )}
 

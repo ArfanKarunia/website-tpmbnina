@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/app/utils/supabase/client";
-import { User, Phone, Calendar, CheckCircle2, AlertCircle, Activity, MapPin, Heart, Baby, Clock, Stethoscope } from "lucide-react";
+import { User, Phone, Calendar, CheckCircle2, AlertCircle, Activity, MapPin, Heart, Baby, Clock } from "lucide-react";
 
 const TARIF_USG = [
   { nama: "2D (Hitam Putih)", harga: 100000 },
@@ -27,6 +27,18 @@ export default function ReservasiUSGPublic() {
     patient_name: "", umur: "", nama_suami: "", alamat: "", phone: "",
     tanggal_reservasi: "", jam_reservasi: "", kehamilan_ke: "", hpht: "", jenis_usg: "", harga: 0,
   });
+
+  // 🔥 LOGIKA PENANGKAP KODE REFERENSI OTOMATIS DARI LINK
+  useEffect(() => {
+    // Membaca URL saat ini (misal: .../reservasi-usg?ref=K01)
+    const params = new URLSearchParams(window.location.search);
+    const refCode = params.get("ref");
+    
+    // Jika ada refCode, diam-diam simpan ke state tanpa sepengetahuan pasien
+    if (refCode) {
+      setNewPatient(prev => ({ ...prev, kode_referensi: refCode.toUpperCase() }));
+    }
+  }, []);
 
   const getTodayWIB = () => {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
@@ -210,25 +222,7 @@ export default function ReservasiUSGPublic() {
       <div className="bg-white w-full max-w-2xl p-5 md:p-8 rounded-3xl shadow-xl border border-white/50 backdrop-blur-sm relative z-10">
         
         <div className="text-center mb-6 md:mb-8 pb-5 md:pb-6 border-b border-gray-100 relative">
-          
-          {/* 🔥 FORM KODE REFERENSI (Diposisikan elegan di pojok Kiri Atas area Form) */}
-          <div className="absolute -top-2 left-0 md:-left-2 z-20">
-            <div className="group relative flex items-center">
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl blur opacity-25 group-focus-within:opacity-50 transition duration-500"></div>
-              <div className="relative flex items-center bg-white border border-gray-200 rounded-lg shadow-sm px-2 py-1 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
-                <Stethoscope size={14} className="text-blue-500 ml-1 mr-2 shrink-0"/>
-                <input 
-                  type="text" 
-                  maxLength={10}
-                  value={newPatient.kode_referensi} 
-                  onChange={(e) => setNewPatient({...newPatient, kode_referensi: e.target.value})} 
-                  className="w-24 md:w-32 bg-transparent text-xs md:text-sm font-bold text-gray-700 outline-none uppercase placeholder:normal-case placeholder:font-normal placeholder:text-gray-400" 
-                  placeholder="Kode Rujukan" 
-                />
-              </div>
-            </div>
-          </div>
-          
+                    
           <div className="w-14 h-14 md:w-16 md:h-16 bg-pink-100 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 mt-6 md:mt-0"><Activity size={28} className="text-pink-600" /></div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-800">Form Reservasi USG</h1>
           <p className="text-gray-500 text-xs md:text-sm mt-1 md:mt-2">Klinik TPMB Nina Rahayu</p>
