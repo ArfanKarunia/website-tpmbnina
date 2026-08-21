@@ -56,7 +56,7 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
   // Daftar Menu Utama
   const mainMenus = [
     { name: "Beranda", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Pelayanan", href: "/dashboard/reservasi", icon: Stethoscope },
+    { name: "Pelayanan", href: "/dashboard/pelayanan", icon: Stethoscope },
     { name: "Data Pasien", href: "/dashboard/pasien", icon: Users },
     { name: "Keuangan", href: "/dashboard/keuangan", icon: Wallet },
     { name: "Stok Obat",  href: "/dashboard/obat", icon: Pill },
