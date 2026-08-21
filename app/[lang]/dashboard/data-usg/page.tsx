@@ -30,6 +30,7 @@ const TARIF_USG = [
   { nama: "2D (Berwarna)", harga: 120000 },
   { nama: "Cek IUD", harga: 120000 },
   { nama: "Kesehatan Produksi", harga: 120000 },
+  { nama: "Program Kehamilan", harga: 120000 },
   { nama: "3D (Hitam Putih)", harga: 150000 },
   { nama: "3D (Berwarna)", harga: 180000 },
   { nama: "4D (Hitam Putih)", harga: 220000 },
@@ -252,7 +253,7 @@ export default function DataUSGPage() {
   // --- LOGIKA REKAP YANG DIPERBARUI ---
   const generateRekapBulanan = () => {
     const rekap = { minggu1: 0, minggu2: 0, minggu3: 0, minggu4: 0, totalPasien: 0, totalUang: 0 };
-    const rekapLayanan = { usg2D: 0, usg3D: 0, usg4D: 0, iud: 0, promil: 0 }; // 🔥 State Baru untuk Rekap Layanan
+    const rekapLayanan = { usg2D: 0, usg3D: 0, usg4D: 0, iud: 0, promil: 0, kespro:0 };
 
     patients.filter(p => p.status === 'selesai').forEach(p => {
       // Hitung Pendapatan Mingguan
@@ -269,7 +270,8 @@ export default function DataUSGPage() {
       else if (jenis.includes("3d")) rekapLayanan.usg3D += 1;
       else if (jenis.includes("4d")) rekapLayanan.usg4D += 1;
       else if (jenis.includes("iud")) rekapLayanan.iud += 1;
-      else if (jenis.includes("produksi") || jenis.includes("promil")) rekapLayanan.promil += 1;
+      else if (jenis.includes("promil")) rekapLayanan.promil += 1;
+      else if (jenis.includes("kespro")) rekapLayanan.kespro += 1;
     });
 
     return { rekap, rekapLayanan };
@@ -437,8 +439,12 @@ export default function DataUSGPage() {
                   <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.iud} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                  <p className="text-xs font-bold text-gray-500 mb-1">Promil / Kespro</p>
+                  <p className="text-xs font-bold text-gray-500 mb-1">Promil</p>
                   <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.promil} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-xs font-bold text-gray-500 mb-1">Kespro</p>
+                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.kespro} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
               </div>
            </div>
