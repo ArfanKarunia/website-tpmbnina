@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/app/utils/supabase/client";
 import { 
   Search, Plus, Calendar, Clock, CheckCircle2, XCircle, 
-  Users, Phone, Activity, AlertTriangle, CalendarDays, BarChart3, Pencil
+  Users, Phone, Activity, AlertTriangle, CalendarDays, BarChart3, Pencil, Stethoscope
 } from "lucide-react";
 
 interface USGPasien {
@@ -249,19 +249,33 @@ export default function DataUSGPage() {
 
   const formatRupiah = (angka: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(angka);
 
-  const generateRekapMingguan = () => {
+  // --- LOGIKA REKAP YANG DIPERBARUI ---
+  const generateRekapBulanan = () => {
     const rekap = { minggu1: 0, minggu2: 0, minggu3: 0, minggu4: 0, totalPasien: 0, totalUang: 0 };
+    const rekapLayanan = { usg2D: 0, usg3D: 0, usg4D: 0, iud: 0, promil: 0 }; // 🔥 State Baru untuk Rekap Layanan
+
     patients.filter(p => p.status === 'selesai').forEach(p => {
+      // Hitung Pendapatan Mingguan
       const day = parseInt(p.tanggal_reservasi.split("-")[2]); 
       rekap.totalPasien += 1; rekap.totalUang += p.harga;
       if (day <= 7) rekap.minggu1 += p.harga;
       else if (day <= 14) rekap.minggu2 += p.harga;
       else if (day <= 21) rekap.minggu3 += p.harga;
       else rekap.minggu4 += p.harga;
+
+      // 🔥 Hitung Kategori Layanan
+      const jenis = p.jenis_usg.toLowerCase();
+      if (jenis.includes("2d")) rekapLayanan.usg2D += 1;
+      else if (jenis.includes("3d")) rekapLayanan.usg3D += 1;
+      else if (jenis.includes("4d")) rekapLayanan.usg4D += 1;
+      else if (jenis.includes("iud")) rekapLayanan.iud += 1;
+      else if (jenis.includes("produksi") || jenis.includes("promil")) rekapLayanan.promil += 1;
     });
-    return rekap;
+
+    return { rekap, rekapLayanan };
   };
-  const rekapData = generateRekapMingguan();
+  
+  const { rekap: rekapData, rekapLayanan } = generateRekapBulanan();
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto">
@@ -397,6 +411,35 @@ export default function DataUSGPage() {
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
                  <p className="text-xs font-bold text-gray-500 mb-2">Pemasukan Minggu 4 (Tgl 22+)</p>
                  <h4 className="text-xl font-black text-blue-600">{formatRupiah(rekapData.minggu4)}</h4>
+              </div>
+           </div>
+
+           {/* 🔥 REKAP JENIS LAYANAN (DITAMBAHKAN DI SINI) */}
+           <div className="mt-8 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <Stethoscope size={20} className="text-pink-500" /> Rincian Penggunaan Layanan (Bulan Ini)
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-xs font-bold text-gray-500 mb-1">USG 2D</p>
+                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg2D} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-xs font-bold text-gray-500 mb-1">USG 3D</p>
+                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg3D} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-xs font-bold text-gray-500 mb-1">USG 4D</p>
+                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg4D} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-xs font-bold text-gray-500 mb-1">Cek IUD</p>
+                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.iud} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-xs font-bold text-gray-500 mb-1">Promil / Kespro</p>
+                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.promil} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                </div>
               </div>
            </div>
 

@@ -106,9 +106,9 @@ export default function KehamilanPage() {
                     status: calc.status
                 };
             })
-            // FILTER PENYELAMAT: Hanya tampilkan usia kehamilan 0 - 45 minggu
-            // Yang usianya 69 minggu atau minus (salah input) akan disembunyikan otomatis!
-            .filter((mom) => (mom.uk !== undefined) && mom.uk >= 0 && mom.uk <= 45); 
+            // 🔥 FILTER PENYELAMAT: Hanya tampilkan usia kehamilan 0 - 42 minggu
+            // Yang usianya 43 minggu ke atas atau minus (salah input) akan disembunyikan otomatis!
+            .filter((mom) => (mom.uk !== undefined) && mom.uk >= 0 && mom.uk <= 42); 
 
           setMoms(processed);
       }
@@ -253,7 +253,8 @@ export default function KehamilanPage() {
           <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-300">
              <Baby size={48} className="mx-auto mb-4 text-gray-300"/>
              <h3 className="text-gray-800 font-bold">Belum ada data ibu hamil aktif</h3>
-             <p className="text-gray-500 text-sm">Coba daftarkan HPHT baru (misal: Awal 2026) agar masuk rentang 0-45 minggu.</p>
+             {/* 🔥 Teks ini juga sudah diupdate menjadi 42 minggu */}
+             <p className="text-gray-500 text-sm">Coba daftarkan HPHT baru agar masuk rentang 0-42 minggu.</p>
           </div>
       )}
 

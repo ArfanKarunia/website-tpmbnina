@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/app/utils/supabase/client";
-import { Search, Plus, User, FileText, Activity, Eye, Pencil, Trash2, CalendarDays } from "lucide-react";
+import { Search, Plus, User, FileText, Activity, Eye, Pencil, Trash2, CalendarDays, Filter } from "lucide-react";
 import AddMedicalRecordModal from "../AddMedicalRecordModal";
 import MedicalRecordDetailModal from "../MedicalRecordDetailModal"; 
 import ActionModal from "../ActionModal"; 
@@ -34,7 +34,11 @@ export default function PelayananPage() {
   const supabase = createClient();
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // State Filter & Search
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(""); // 🔥 State untuk penundaan ketik
+  const [filterMonth, setFilterMonth] = useState(""); // Default Semua Waktu
 
   // Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -46,20 +50,52 @@ export default function PelayananPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // --- LOGIKA DEBOUNCE (Menunggu user selesai mengetik 0.5 detik) ---
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); 
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // --- SERVER-SIDE FILTERING (Mencari langsung ke Database) ---
   const fetchRecords = async () => {
     setIsLoading(true);
-    const { data } = await supabase
-      .from("medical_records")
-      .select("*")
-      .order("visit_date", { ascending: false }); 
+    let query = supabase.from("medical_records").select("*");
+
+    // 1. Suruh Supabase filter bulan
+    if (filterMonth) {
+      const year = parseInt(filterMonth.split("-")[0]);
+      const month = parseInt(filterMonth.split("-")[1]);
+      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
+      query = query.gte("visit_date", startDate).lte("visit_date", endDate);
+    }
+
+    // 2. Suruh Supabase filter teks pencarian
+    if (debouncedSearchTerm) {
+      // Menggunakan pencarian case-insensitive (ilike) untuk nama atau diagnosa
+      query = query.or(`patient_name.ilike.%${debouncedSearchTerm}%,diagnosis.ilike.%${debouncedSearchTerm}%`);
+    }
+
+    // Ambil data terbaru
+    const { data, error } = await query.order("visit_date", { ascending: false }).limit(1000);
     
-    if (data) setRecords(data as unknown as MedicalRecord[]);
+    if (data && !error) {
+       setRecords(data as unknown as MedicalRecord[]);
+    } else {
+       setRecords([]);
+    }
     setIsLoading(false);
   };
 
-  useEffect(() => { fetchRecords(); }, []);
+  // Trigger ulang database jika Search atau Bulan berubah
+  useEffect(() => { 
+     fetchRecords(); 
+  }, [debouncedSearchTerm, filterMonth]);
 
-// --- LOGIKA HAPUS YANG SUDAH DIPERBAIKI (SYNC STOK OBAT) ---
+  // --- LOGIKA HAPUS YANG SUDAH DIPERBAIKI (SYNC STOK OBAT) ---
   const handleDelete = async () => {
     if (!deleteId) return;
     setIsDeleting(true);
@@ -93,7 +129,7 @@ export default function PelayananPage() {
        
        if (error) throw error;
        setIsDeleteOpen(false);
-       fetchRecords();
+       fetchRecords(); // Refresh data
        
     } catch (error: any) {
        alert("Gagal menghapus: " + error.message);
@@ -102,32 +138,25 @@ export default function PelayananPage() {
     }
   };
 
-  // 1. FILTER DATA
-  const filteredRecords = records.filter(r => 
-    r.patient_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    r.diagnosis?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // 2. GROUPING DATA PER HARI (LOGIKA BARU)
+  // 3. GROUPING DATA PER HARI (Data sudah terfilter dari Supabase)
   const groupedRecords = useMemo(() => {
     const groups: { [key: string]: MedicalRecord[] } = {};
     
-    filteredRecords.forEach((record) => {
-      const dateKey = record.visit_date; // Format YYYY-MM-DD
+    records.forEach((record) => {
+      const dateKey = record.visit_date; 
       if (!groups[dateKey]) {
         groups[dateKey] = [];
       }
       groups[dateKey].push(record);
     });
 
-    // Urutkan tanggal dari yang terbaru ke terlama
     const sortedKeys = Object.keys(groups).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
     
     return sortedKeys.map(date => ({
       date,
       items: groups[date]
     }));
-  }, [filteredRecords]);
+  }, [records]);
 
 
   return (
@@ -140,8 +169,8 @@ export default function PelayananPage() {
            <p className="text-gray-500 text-sm">Rekapitulasi pemeriksaan pasien harian.</p>
         </div>
         <div className="flex gap-3">
-
-        <ExportExcelButton records={filteredRecords.length > 0 ? filteredRecords : records} />
+        {/* Tombol Export sekarang langsung mengambil data records (karena sudah difilter server) */}
+        <ExportExcelButton records={records} />
         <button 
           onClick={() => { setSelectedRecord(null); setIsFormOpen(true); }}
           className="bg-blue-600 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all"
@@ -151,16 +180,42 @@ export default function PelayananPage() {
       </div>
       </div>
 
-      {/* Search */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm relative">
-         <Search className="absolute left-7 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-         <input 
-           type="text" 
-           placeholder="Cari nama pasien atau diagnosa..." 
-           className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-           value={searchTerm}
-           onChange={(e) => setSearchTerm(e.target.value)}
-         />
+      {/* 🔥 SEARCH & FILTER SECTION */}
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* Search Bar */}
+        <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-sm relative flex-1 flex items-center">
+           <Search className="absolute left-4 text-gray-400" size={20} />
+           <input 
+             type="text" 
+             placeholder="Cari nama pasien atau diagnosa..." 
+             className="w-full pl-12 pr-4 py-2 bg-transparent focus:outline-none focus:ring-0 text-gray-700"
+             value={searchTerm}
+             onChange={(e) => setSearchTerm(e.target.value)}
+           />
+        </div>
+
+        {/* Month Filter */}
+        <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-3 px-4 shrink-0 justify-between lg:justify-start">
+           <div className="flex items-center gap-2">
+             <Filter size={18} className="text-gray-400" />
+             <input 
+               type="month" 
+               value={filterMonth}
+               onChange={(e) => setFilterMonth(e.target.value)}
+               className="bg-transparent focus:outline-none text-gray-600 font-medium outline-none cursor-pointer"
+             />
+           </div>
+           
+           {/* Tombol Reset Filter */}
+           {filterMonth && (
+             <button 
+               onClick={() => setFilterMonth("")} 
+               className="text-xs text-red-500 hover:text-red-700 font-bold px-2 py-1 bg-red-50 rounded-lg transition-colors"
+             >
+               Reset
+             </button>
+           )}
+        </div>
       </div>
 
       {/* CONTENT GROUP PER HARI */}

@@ -177,8 +177,8 @@ if (moms) {
         trimester: calc.trimester
       };
     })
-    // 1. FILTER: Buang pasien ghaib yang sudah melahirkan (> 45 minggu)
-    .filter(mom => mom.usiaKehamilan !== undefined && mom.usiaKehamilan >= 0 && mom.usiaKehamilan <= 45)
+    // 1. FILTER: Buang pasien ghaib yang sudah melahirkan (> 42 minggu)
+    .filter(mom => mom.usiaKehamilan !== undefined && mom.usiaKehamilan >= 0 && mom.usiaKehamilan <= 42)
     
     // 2. SORTING: Urutkan dari usia paling besar (Misal: 38 minggu di atas, 4 minggu di bawah)
     // Tujuannya agar Bidan Nina fokus ke pasien yang mau lahiran dulu.
@@ -310,10 +310,10 @@ setLoading(false);
               <span className="text-[10px] bg-pink-50 text-pink-600 px-2 py-1 rounded-full font-bold">Auto-HPL</span>
             </div>
             <div className="space-y-4">
-              {/* --- KITA TAMBAHKAN FILTER MAKSIMAL 45 MINGGU DI SINI --- */}
-              {ancPatients.filter(mom => mom.usiaKehamilan >= 0 && mom.usiaKehamilan <= 45).length > 0 ? 
+              {/* --- KITA TAMBAHKAN FILTER MAKSIMAL 42 MINGGU DI SINI --- */}
+              {ancPatients.filter(mom => mom.usiaKehamilan >= 0 && mom.usiaKehamilan <= 42).length > 0 ? 
                 ancPatients
-                  .filter(mom => mom.usiaKehamilan >= 0 && mom.usiaKehamilan <= 45)
+                  .filter(mom => mom.usiaKehamilan >= 0 && mom.usiaKehamilan <= 42)
                   .map((mom, idx) => (
                 <div key={idx} className={`p-4 rounded-xl border transition-all group bg-white ${mom.usiaKehamilan >= 37 ? 'border-red-200 bg-red-50/50' : 'border-gray-100 hover:border-pink-200'}`}>
                   <div className="flex justify-between items-start mb-2">
