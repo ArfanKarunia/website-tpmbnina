@@ -267,11 +267,11 @@ export default function DataUSGPage() {
       // 🔥 Hitung Kategori Layanan
       const jenis = p.jenis_usg.toLowerCase();
       if (jenis.includes("2d (hitam putih)")) rekapLayanan.usg2DBW += 1;
-      else if (jenis.includes("2d (bewarna)")) rekapLayanan.usg2DCR += 1;
+      else if (jenis.includes("2d (berwarna)")) rekapLayanan.usg2DCR += 1;
       else if (jenis.includes("3d (hitam putih)")) rekapLayanan.usg3DBW += 1;
-      else if (jenis.includes("3d (bewarna)")) rekapLayanan.usg3DCR += 1;
+      else if (jenis.includes("3d (berwarna)")) rekapLayanan.usg3DCR += 1;
       else if (jenis.includes("4d (hitam putih)")) rekapLayanan.usg4DBW += 1;
-      else if (jenis.includes("4d (bewarna)")) rekapLayanan.usg4DCR  += 1;
+      else if (jenis.includes("4d (berwarna)")) rekapLayanan.usg4DCR  += 1;
       else if (jenis.includes("iud")) rekapLayanan.iud += 1;
       else if (jenis.includes("promil")) rekapLayanan.promil += 1;
       else if (jenis.includes("kespro")) rekapLayanan.kespro += 1;
