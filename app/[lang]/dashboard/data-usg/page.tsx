@@ -253,7 +253,7 @@ export default function DataUSGPage() {
   // --- LOGIKA REKAP YANG DIPERBARUI ---
   const generateRekapBulanan = () => {
     const rekap = { minggu1: 0, minggu2: 0, minggu3: 0, minggu4: 0, totalPasien: 0, totalUang: 0 };
-    const rekapLayanan = { usg2D: 0, usg3D: 0, usg4D: 0, iud: 0, promil: 0, kespro:0 };
+    const rekapLayanan = { usg2DBW: 0, usg2DCR: 0, usg3DBW: 0, usg3DCR:0, usg4DBW:0, usg4DCR: 0, iud: 0, promil: 0, kespro: 0 };
 
     patients.filter(p => p.status === 'selesai').forEach(p => {
       // Hitung Pendapatan Mingguan
@@ -266,9 +266,12 @@ export default function DataUSGPage() {
 
       // 🔥 Hitung Kategori Layanan
       const jenis = p.jenis_usg.toLowerCase();
-      if (jenis.includes("2d")) rekapLayanan.usg2D += 1;
-      else if (jenis.includes("3d")) rekapLayanan.usg3D += 1;
-      else if (jenis.includes("4d")) rekapLayanan.usg4D += 1;
+      if (jenis.includes("2d hitam putih")) rekapLayanan.usg2DBW += 1;
+      if (jenis.includes("2d bewarna")) rekapLayanan.usg2DCR += 1;
+      else if (jenis.includes("3d hitam putih")) rekapLayanan.usg3DBW += 1;
+      else if (jenis.includes("3d bewarna")) rekapLayanan.usg3DCR += 1;
+      else if (jenis.includes("4d hitam putih")) rekapLayanan.usg4DBW += 1;
+      else if (jenis.includes("4d bewarna")) rekapLayanan.usg4DCR  += 1;
       else if (jenis.includes("iud")) rekapLayanan.iud += 1;
       else if (jenis.includes("promil")) rekapLayanan.promil += 1;
       else if (jenis.includes("kespro")) rekapLayanan.kespro += 1;
@@ -423,16 +426,28 @@ export default function DataUSGPage() {
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                  <p className="text-xs font-bold text-gray-500 mb-1">USG 2D</p>
-                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg2D} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                  <p className="text-xs font-bold text-gray-500 mb-1">USG 2D B&W</p>
+                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg2DBW} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                  <p className="text-xs font-bold text-gray-500 mb-1">USG 3D</p>
-                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg3D} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                  <p className="text-xs font-bold text-gray-500 mb-1">USG 2D Color</p>
+                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg2DCR} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                  <p className="text-xs font-bold text-gray-500 mb-1">USG 4D</p>
-                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg4D} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                  <p className="text-xs font-bold text-gray-500 mb-1">USG 3D B&W</p>
+                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg3DBW} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-xs font-bold text-gray-500 mb-1">USG 3D Color</p>
+                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg3DCR} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-xs font-bold text-gray-500 mb-1">USG 4D B&W</p>
+                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg4DBW} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-xs font-bold text-gray-500 mb-1">USG 4D Color</p>
+                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg4DCR} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
                   <p className="text-xs font-bold text-gray-500 mb-1">Cek IUD</p>
