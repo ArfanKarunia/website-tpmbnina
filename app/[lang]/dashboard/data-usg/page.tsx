@@ -46,14 +46,13 @@ export default function DataUSGPage() {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]); 
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null); // State untuk mode Edit
+  const [editingId, setEditingId] = useState<string | null>(null); 
   
   const [newPatient, setNewPatient] = useState({
     patient_name: "", umur: "", nama_suami: "", alamat: "", phone: "",
     tanggal_reservasi: selectedDate, jam_reservasi: "", kehamilan_ke: "", hpht: "", jenis_usg: "", harga: 0
   });
 
-  // --- LOGIKA JAM OPERASIONAL & VALIDASI WAKTU HABIS ---
   const getJamOperasional = (dateString: string) => {
     if (!dateString) return "";
     const day = new Date(dateString).getDay();
@@ -124,7 +123,6 @@ export default function DataUSGPage() {
     if (!error) fetchPatients(); 
   };
 
-  // BUKA MODAL UNTUK EDIT
   const handleEditClick = (patient: USGPasien) => {
     setEditingId(patient.id);
     setNewPatient({
@@ -152,7 +150,6 @@ export default function DataUSGPage() {
     });
   };
 
-  // SUBMIT (TAMBAH BARU ATAU UPDATE)
   const handleSubmitPatient = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -160,17 +157,14 @@ export default function DataUSGPage() {
         alert("Gagal! Hari yang dipilih bukan jadwal USG."); return;
     }
 
-    // Jika buat baru dan jam sudah lewat
     if (!editingId && isWaktuHabis(newPatient.tanggal_reservasi)) {
         alert("Pendaftaran ditolak! Jam operasional USG untuk hari ini sudah berakhir. Silakan pilih hari lain."); return;
     }
 
     if (editingId) {
-      // --- LOGIKA UPDATE DATA ---
       const originalPatient = patients.find(p => p.id === editingId);
       let antrianToSave = originalPatient?.no_antrian;
 
-      // Jika staf mengubah tanggal saat edit, hitung ulang antrian di tanggal baru
       if (originalPatient?.tanggal_reservasi !== newPatient.tanggal_reservasi) {
         const { data: antrianData } = await supabase
           .from("usg_reservations")
@@ -213,7 +207,6 @@ export default function DataUSGPage() {
       }
 
     } else {
-      // --- LOGIKA INSERT DATA BARU ---
       const antrianHariItu = patients.filter(p => p.tanggal_reservasi === newPatient.tanggal_reservasi && p.status !== 'batal');
       if (antrianHariItu.length >= 25) {
           alert("Penuh! Kuota 25 pasien untuk hari ini sudah habis."); return;
@@ -250,13 +243,11 @@ export default function DataUSGPage() {
 
   const formatRupiah = (angka: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(angka);
 
-  // --- LOGIKA REKAP YANG DIPERBARUI ---
   const generateRekapBulanan = () => {
     const rekap = { minggu1: 0, minggu2: 0, minggu3: 0, minggu4: 0, totalPasien: 0, totalUang: 0 };
     const rekapLayanan = { usg2DBW: 0, usg2DCR: 0, usg3DBW: 0, usg3DCR:0, usg4DBW:0, usg4DCR: 0, iud: 0, promil: 0, kespro: 0 };
 
     patients.filter(p => p.status === 'selesai').forEach(p => {
-      // Hitung Pendapatan Mingguan
       const day = parseInt(p.tanggal_reservasi.split("-")[2]); 
       rekap.totalPasien += 1; rekap.totalUang += p.harga;
       if (day <= 7) rekap.minggu1 += p.harga;
@@ -264,7 +255,6 @@ export default function DataUSGPage() {
       else if (day <= 21) rekap.minggu3 += p.harga;
       else rekap.minggu4 += p.harga;
 
-      // 🔥 Hitung Kategori Layanan
       const jenis = p.jenis_usg.toLowerCase();
       if (jenis.includes("2d (hitam putih)")) rekapLayanan.usg2DBW += 1;
       else if (jenis.includes("2d (berwarna)")) rekapLayanan.usg2DCR += 1;
@@ -273,8 +263,8 @@ export default function DataUSGPage() {
       else if (jenis.includes("4d (hitam putih)")) rekapLayanan.usg4DBW += 1;
       else if (jenis.includes("4d (berwarna)")) rekapLayanan.usg4DCR  += 1;
       else if (jenis.includes("iud")) rekapLayanan.iud += 1;
-      else if (jenis.includes("promil")) rekapLayanan.promil += 1;
-      else if (jenis.includes("kespro")) rekapLayanan.kespro += 1;
+      else if (jenis.includes("program kehamilan")) rekapLayanan.promil += 1;
+      else if (jenis.includes("kesehatan produksi")) rekapLayanan.kespro += 1;
     });
 
     return { rekap, rekapLayanan };
@@ -283,107 +273,131 @@ export default function DataUSGPage() {
   const { rekap: rekapData, rekapLayanan } = generateRekapBulanan();
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto">
+    // 🔥 PERBAIKAN: Penambahan min-w-0 pada wrapper terluar agar tabel tidak bisa menjebol layout
+    <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto w-full min-w-0">
       
       {/* HEADER & FILTER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
             <Activity className="text-pink-500" /> Data Pemeriksaan USG
           </h1>
-          <p className="text-gray-500 text-sm mt-1">Kelola antrian dan rekapitulasi data USG TPMB Nina.</p>
+          <p className="text-gray-500 text-xs md:text-sm mt-1">Kelola antrian dan rekapitulasi data USG TPMB Nina.</p>
         </div>
         
-        <div className="flex items-center gap-3 bg-gray-50 p-1.5 rounded-xl border border-gray-200">
-          <button onClick={() => setActiveTab("harian")} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === "harian" ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-700"}`}><CalendarDays size={16}/> Antrian Harian</button>
-          <button onClick={() => setActiveTab("rekap")} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === "rekap" ? "bg-white shadow-sm text-pink-600" : "text-gray-500 hover:text-gray-700"}`}><BarChart3 size={16}/> Rekap Bulanan</button>
+        <div className="grid grid-cols-2 md:flex md:items-center gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-200">
+          <button onClick={() => setActiveTab("harian")} className={`px-2 py-2 md:px-4 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center justify-center gap-1.5 md:gap-2 ${activeTab === "harian" ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
+            <CalendarDays size={16} className="shrink-0"/> <span className="truncate">Harian</span>
+          </button>
+          <button onClick={() => setActiveTab("rekap")} className={`px-2 py-2 md:px-4 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center justify-center gap-1.5 md:gap-2 ${activeTab === "rekap" ? "bg-white shadow-sm text-pink-600" : "text-gray-500 hover:text-gray-700"}`}>
+            <BarChart3 size={16} className="shrink-0"/> <span className="truncate">Rekap Bulanan</span>
+          </button>
         </div>
       </div>
 
-      <div className="flex items-center gap-3 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-         <span className="text-sm font-bold text-gray-600">Pilih Waktu:</span>
-         <input type={activeTab === "harian" ? "date" : "month"} value={activeTab === "harian" ? selectedDate : selectedDate.substring(0, 7)} onChange={(e) => setSelectedDate(activeTab === "harian" ? e.target.value : `${e.target.value}-01`)} className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 font-medium text-gray-700" />
+      {/* FILTER TANGGAL & GO SHOW */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+            <span className="text-sm font-bold text-gray-600 shrink-0">Pilih Waktu:</span>
+            <input 
+              type={activeTab === "harian" ? "date" : "month"} 
+              value={activeTab === "harian" ? selectedDate : selectedDate.substring(0, 7)} 
+              onChange={(e) => setSelectedDate(activeTab === "harian" ? e.target.value : `${e.target.value}-01`)} 
+              className="w-full sm:w-auto px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 text-sm font-medium text-gray-700" 
+            />
+         </div>
+          
           {activeTab === "harian" && hariIniBuka && (
-            <button onClick={() => { setEditingId(null); setIsModalOpen(true); }} className="ml-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md shadow-blue-500/20"><Plus size={18} /> Pasien Go-Show</button>
+            <button onClick={() => { setEditingId(null); setIsModalOpen(true); }} className="w-full sm:w-auto sm:ml-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md shrink-0">
+              <Plus size={18} /> Pasien Go-Show
+            </button>
           )}
       </div>
 
       {activeTab === "harian" && !hariIniBuka && (
-        <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl flex items-center gap-3"><AlertTriangle size={24} className="shrink-0" /><div><h4 className="font-bold">USG Tutup pada hari ini.</h4><p className="text-sm">Pelayanan USG hanya tersedia di hari <b>Selasa, Jumat, Sabtu, dan Minggu</b>.</p></div></div>
+        <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl flex items-start gap-3">
+          <AlertTriangle size={24} className="shrink-0 mt-0.5" />
+          <div className="w-full">
+            <h4 className="font-bold text-sm md:text-base">USG Tutup pada hari ini.</h4>
+            <p className="text-xs md:text-sm mt-1">Pelayanan USG hanya tersedia di hari <b>Selasa, Jumat, Sabtu, dan Minggu</b>.</p>
+          </div>
+        </div>
       )}
 
       {/* --- TABEL ANTRIAN HARIAN --- */}
       {activeTab === "harian" && (
-        <>
+        // 🔥 PERBAIKAN: Mengurung seluruh section harian di dalam Grid 1 Kolom
+        <div className="grid grid-cols-1 gap-4 w-full min-w-0">
+          
           {/* INDIKATOR KUOTA & STATUS */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-2">
-            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><Users size={24}/></div>
-              <div><p className="text-xs text-gray-500 font-bold">Total Antrian</p><h3 className="text-2xl font-black text-gray-800">{patients.filter(p => p.status !== 'batal').length} <span className="text-sm font-medium text-gray-400">/ 25</span></h3></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 w-full">
+            <div className="bg-white p-3 md:p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><Users size={20} className="md:w-6 md:h-6"/></div>
+              <div><p className="text-[10px] md:text-xs text-gray-500 font-bold">Total Antrian</p><h3 className="text-lg md:text-2xl font-black text-gray-800">{patients.filter(p => p.status !== 'batal').length} <span className="text-[10px] md:text-sm font-medium text-gray-400">/ 25</span></h3></div>
             </div>
-            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center shrink-0"><Clock size={24}/></div>
-              <div><p className="text-xs text-gray-500 font-bold">Menunggu</p><h3 className="text-2xl font-black text-gray-800">{patients.filter(p => p.status === 'menunggu').length}</h3></div>
+            <div className="bg-white p-3 md:p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center shrink-0"><Clock size={20} className="md:w-6 md:h-6"/></div>
+              <div><p className="text-[10px] md:text-xs text-gray-500 font-bold">Menunggu</p><h3 className="text-lg md:text-2xl font-black text-gray-800">{patients.filter(p => p.status === 'menunggu').length}</h3></div>
             </div>
-            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-green-50 text-green-600 flex items-center justify-center shrink-0"><CheckCircle2 size={24}/></div>
-              <div><p className="text-xs text-gray-500 font-bold">Selesai</p><h3 className="text-2xl font-black text-gray-800">{patients.filter(p => p.status === 'selesai').length}</h3></div>
+            <div className="bg-white p-3 md:p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-green-50 text-green-600 flex items-center justify-center shrink-0"><CheckCircle2 size={20} className="md:w-6 md:h-6"/></div>
+              <div><p className="text-[10px] md:text-xs text-gray-500 font-bold">Selesai</p><h3 className="text-lg md:text-2xl font-black text-gray-800">{patients.filter(p => p.status === 'selesai').length}</h3></div>
             </div>
-            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center shrink-0"><XCircle size={24}/></div>
-              <div><p className="text-xs text-gray-500 font-bold">Batal</p><h3 className="text-2xl font-black text-gray-800">{patients.filter(p => p.status === 'batal').length}</h3></div>
+            <div className="bg-white p-3 md:p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center shrink-0"><XCircle size={20} className="md:w-6 md:h-6"/></div>
+              <div><p className="text-[10px] md:text-xs text-gray-500 font-bold">Batal</p><h3 className="text-lg md:text-2xl font-black text-gray-800">{patients.filter(p => p.status === 'batal').length}</h3></div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+          {/* 🔥 TABLE WRAPPER YANG AMAN */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden w-full min-w-0">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wider text-gray-500 font-bold">
-                    <th className="p-4 pl-6 text-center w-24">Antrian</th>
-                    <th className="p-4">Nama Pasien</th>
-                    <th className="p-4">Layanan & Waktu</th>
-                    <th className="p-4">Tarif</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4 pr-6 text-right">Aksi</th>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-[10px] md:text-xs uppercase tracking-wider text-gray-500 font-bold">
+                    <th className="p-3 md:p-4 pl-4 md:pl-6 text-center w-16 md:w-24">No</th>
+                    <th className="p-3 md:p-4">Nama Pasien</th>
+                    <th className="p-3 md:p-4">Layanan & Waktu</th>
+                    <th className="p-3 md:p-4">Tarif</th>
+                    <th className="p-3 md:p-4">Status</th>
+                    <th className="p-3 md:p-4 pr-4 md:pr-6 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {loading ? (
-                    <tr><td colSpan={6} className="text-center py-10 text-gray-400">Memuat data...</td></tr>
+                    <tr><td colSpan={6} className="text-center py-10 text-gray-400 text-sm">Memuat data...</td></tr>
                   ) : patients.length === 0 ? (
-                    <tr><td colSpan={6} className="text-center py-10 text-gray-400 font-medium">Belum ada pasien terdaftar.</td></tr>
+                    <tr><td colSpan={6} className="text-center py-10 text-gray-400 font-medium text-sm">Belum ada pasien terdaftar.</td></tr>
                   ) : (
                     patients.map((patient) => (
                       <tr key={patient.id} className="hover:bg-pink-50/30 transition-colors group">
-                        <td className="p-4 pl-6 text-center">
-                          <div className="w-12 h-12 mx-auto bg-pink-100 text-pink-600 rounded-2xl flex items-center justify-center font-black text-xl border border-pink-200 shadow-sm group-hover:bg-pink-500 group-hover:text-white transition-all">
+                        <td className="p-3 md:p-4 pl-4 md:pl-6 text-center">
+                          <div className="w-8 h-8 md:w-12 md:h-12 mx-auto bg-pink-100 text-pink-600 rounded-xl md:rounded-2xl flex items-center justify-center font-black text-sm md:text-xl border border-pink-200 shadow-sm group-hover:bg-pink-500 group-hover:text-white transition-all">
                             {patient.no_antrian || "-"}
                           </div>
                         </td>
-                        <td className="p-4">
-                          <p className="font-bold text-gray-800 text-base">{patient.patient_name}</p>
-                          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Phone size={10}/> {patient.phone}</p>
+                        <td className="p-3 md:p-4">
+                          <p className="font-bold text-gray-800 text-sm md:text-base">{patient.patient_name}</p>
+                          <p className="text-[10px] md:text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Phone size={10}/> {patient.phone}</p>
                         </td>
-                        <td className="p-4">
-                           <div className="flex flex-col gap-1.5 items-start">
-                              <span className="bg-purple-50 text-purple-700 px-2.5 py-1 rounded-md text-[11px] font-bold border border-purple-100">{patient.jenis_usg}</span>
-                              <span className="text-[11px] font-semibold text-gray-500 flex items-center gap-1"><Clock size={12}/> {patient.jam_reservasi || "-"}</span>
+                        <td className="p-3 md:p-4">
+                           <div className="flex flex-col gap-1 md:gap-1.5 items-start">
+                              <span className="bg-purple-50 text-purple-700 px-2 py-0.5 md:px-2.5 md:py-1 rounded-md text-[9px] md:text-[11px] font-bold border border-purple-100 whitespace-nowrap">{patient.jenis_usg}</span>
+                              <span className="text-[9px] md:text-[11px] font-semibold text-gray-500 flex items-center gap-1 whitespace-nowrap"><Clock size={10} className="md:w-3 md:h-3"/> {patient.jam_reservasi || "-"}</span>
                            </div>
                         </td>
-                        <td className="p-4 font-bold text-gray-700">{formatRupiah(patient.harga)}</td>
-                        <td className="p-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${patient.status === 'selesai' ? 'bg-green-50 text-green-700 border-green-200' : patient.status === 'batal' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}>
+                        <td className="p-3 md:p-4 font-bold text-gray-700 text-sm whitespace-nowrap">{formatRupiah(patient.harga)}</td>
+                        <td className="p-3 md:p-4">
+                          <span className={`px-2 py-1 md:px-3 md:py-1 rounded-full text-[9px] md:text-xs font-bold border whitespace-nowrap ${patient.status === 'selesai' ? 'bg-green-50 text-green-700 border-green-200' : patient.status === 'batal' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}>
                             {patient.status.toUpperCase()}
                           </span>
                         </td>
-                        <td className="p-4 pr-6">
+                        <td className="p-3 md:p-4 pr-4 md:pr-6">
                           {patient.status === 'menunggu' && (
-                            <div className="flex justify-end gap-2">
-                              {/* TOMBOL EDIT DITAMBAHKAN DI SINI */}
-                              <button onClick={() => handleEditClick(patient)} className="p-2.5 bg-white border border-gray-200 text-blue-600 hover:bg-blue-500 hover:text-white hover:border-blue-500 rounded-xl transition-all shadow-sm" title="Edit Data"><Pencil size={20} /></button>
-                              <button onClick={() => updateStatus(patient.id, 'selesai')} className="p-2.5 bg-white border border-gray-200 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 rounded-xl transition-all shadow-sm" title="Tandai Selesai"><CheckCircle2 size={20} /></button>
-                              <button onClick={() => updateStatus(patient.id, 'batal')} className="p-2.5 bg-white border border-gray-200 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 rounded-xl transition-all shadow-sm" title="Batalkan"><XCircle size={20} /></button>
+                            <div className="flex justify-end gap-1.5 md:gap-2">
+                              <button onClick={() => handleEditClick(patient)} className="p-1.5 md:p-2.5 bg-white border border-gray-200 text-blue-600 hover:bg-blue-500 hover:text-white hover:border-blue-500 rounded-lg md:rounded-xl transition-all shadow-sm" title="Edit Data"><Pencil size={16} className="md:w-5 md:h-5" /></button>
+                              <button onClick={() => updateStatus(patient.id, 'selesai')} className="p-1.5 md:p-2.5 bg-white border border-gray-200 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 rounded-lg md:rounded-xl transition-all shadow-sm" title="Tandai Selesai"><CheckCircle2 size={16} className="md:w-5 md:h-5" /></button>
+                              <button onClick={() => updateStatus(patient.id, 'batal')} className="p-1.5 md:p-2.5 bg-white border border-gray-200 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 rounded-lg md:rounded-xl transition-all shadow-sm" title="Batalkan"><XCircle size={16} className="md:w-5 md:h-5" /></button>
                             </div>
                           )}
                         </td>
@@ -394,79 +408,84 @@ export default function DataUSGPage() {
               </table>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* --- TAB REKAP BULANAN --- */}
       {activeTab === "rekap" && (
-        <div className="space-y-6">
-           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
-                 <p className="text-xs font-bold text-gray-500 mb-2">Pemasukan Minggu 1 (Tgl 1-7)</p>
-                 <h4 className="text-xl font-black text-blue-600">{formatRupiah(rekapData.minggu1)}</h4>
+        <div className="space-y-6 w-full">
+           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+              <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
+                 <p className="text-[10px] md:text-xs font-bold text-gray-500 mb-1 md:mb-2">Minggu 1 (Tgl 1-7)</p>
+                 <h4 className="text-base md:text-xl font-black text-blue-600 whitespace-nowrap">{formatRupiah(rekapData.minggu1)}</h4>
               </div>
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
-                 <p className="text-xs font-bold text-gray-500 mb-2">Pemasukan Minggu 2 (Tgl 8-14)</p>
-                 <h4 className="text-xl font-black text-blue-600">{formatRupiah(rekapData.minggu2)}</h4>
+              <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
+                 <p className="text-[10px] md:text-xs font-bold text-gray-500 mb-1 md:mb-2">Minggu 2 (Tgl 8-14)</p>
+                 <h4 className="text-base md:text-xl font-black text-blue-600 whitespace-nowrap">{formatRupiah(rekapData.minggu2)}</h4>
               </div>
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
-                 <p className="text-xs font-bold text-gray-500 mb-2">Pemasukan Minggu 3 (Tgl 15-21)</p>
-                 <h4 className="text-xl font-black text-blue-600">{formatRupiah(rekapData.minggu3)}</h4>
+              <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
+                 <p className="text-[10px] md:text-xs font-bold text-gray-500 mb-1 md:mb-2">Minggu 3 (Tgl 15-21)</p>
+                 <h4 className="text-base md:text-xl font-black text-blue-600 whitespace-nowrap">{formatRupiah(rekapData.minggu3)}</h4>
               </div>
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
-                 <p className="text-xs font-bold text-gray-500 mb-2">Pemasukan Minggu 4 (Tgl 22+)</p>
-                 <h4 className="text-xl font-black text-blue-600">{formatRupiah(rekapData.minggu4)}</h4>
+              <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
+                 <p className="text-[10px] md:text-xs font-bold text-gray-500 mb-1 md:mb-2">Minggu 4 (Tgl 22+)</p>
+                 <h4 className="text-base md:text-xl font-black text-blue-600 whitespace-nowrap">{formatRupiah(rekapData.minggu4)}</h4>
               </div>
            </div>
 
-           {/* 🔥 REKAP JENIS LAYANAN (DITAMBAHKAN DI SINI) */}
            <div className="mt-8 mb-6">
-              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Stethoscope size={20} className="text-pink-500" /> Rincian Penggunaan Layanan (Bulan Ini)
+              <h3 className="text-base md:text-lg font-bold text-gray-800 mb-3 md:mb-4 flex items-center gap-2">
+                <Stethoscope size={18} className="text-pink-500 md:w-5 md:h-5" /> Rincian Layanan
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                  <p className="text-xs font-bold text-gray-500 mb-1">USG 2D B&W</p>
-                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg2DBW} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
+                <div className="bg-white p-3 md:p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-[10px] md:text-xs font-bold text-gray-500 mb-1">USG 2D B&W</p>
+                  <h4 className="text-xl md:text-2xl font-black text-gray-800">{rekapLayanan.usg2DBW} <span className="text-[10px] md:text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                  <p className="text-xs font-bold text-gray-500 mb-1">USG 2D Color</p>
-                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg2DCR} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                <div className="bg-white p-3 md:p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-[10px] md:text-xs font-bold text-gray-500 mb-1">USG 2D Color</p>
+                  <h4 className="text-xl md:text-2xl font-black text-gray-800">{rekapLayanan.usg2DCR} <span className="text-[10px] md:text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                  <p className="text-xs font-bold text-gray-500 mb-1">USG 3D B&W</p>
-                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg3DBW} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                <div className="bg-white p-3 md:p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-[10px] md:text-xs font-bold text-gray-500 mb-1">USG 3D B&W</p>
+                  <h4 className="text-xl md:text-2xl font-black text-gray-800">{rekapLayanan.usg3DBW} <span className="text-[10px] md:text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                  <p className="text-xs font-bold text-gray-500 mb-1">USG 3D Color</p>
-                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg3DCR} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                <div className="bg-white p-3 md:p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-[10px] md:text-xs font-bold text-gray-500 mb-1">USG 3D Color</p>
+                  <h4 className="text-xl md:text-2xl font-black text-gray-800">{rekapLayanan.usg3DCR} <span className="text-[10px] md:text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                  <p className="text-xs font-bold text-gray-500 mb-1">USG 4D B&W</p>
-                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg4DBW} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                <div className="bg-white p-3 md:p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-[10px] md:text-xs font-bold text-gray-500 mb-1">USG 4D B&W</p>
+                  <h4 className="text-xl md:text-2xl font-black text-gray-800">{rekapLayanan.usg4DBW} <span className="text-[10px] md:text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                  <p className="text-xs font-bold text-gray-500 mb-1">USG 4D Color</p>
-                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.usg4DCR} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                <div className="bg-white p-3 md:p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-[10px] md:text-xs font-bold text-gray-500 mb-1">USG 4D Color</p>
+                  <h4 className="text-xl md:text-2xl font-black text-gray-800">{rekapLayanan.usg4DCR} <span className="text-[10px] md:text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                  <p className="text-xs font-bold text-gray-500 mb-1">Cek IUD</p>
-                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.iud} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                <div className="bg-white p-3 md:p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-[10px] md:text-xs font-bold text-gray-500 mb-1">Cek IUD</p>
+                  <h4 className="text-xl md:text-2xl font-black text-gray-800">{rekapLayanan.iud} <span className="text-[10px] md:text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                  <p className="text-xs font-bold text-gray-500 mb-1">Promil</p>
-                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.promil} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                <div className="bg-white p-3 md:p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-[10px] md:text-xs font-bold text-gray-500 mb-1">Promil</p>
+                  <h4 className="text-xl md:text-2xl font-black text-gray-800">{rekapLayanan.promil} <span className="text-[10px] md:text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                  <p className="text-xs font-bold text-gray-500 mb-1">Kespro</p>
-                  <h4 className="text-2xl font-black text-gray-800">{rekapLayanan.kespro} <span className="text-xs font-medium text-gray-400">Pasien</span></h4>
+                <div className="bg-white p-3 md:p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <p className="text-[10px] md:text-xs font-bold text-gray-500 mb-1">Kespro</p>
+                  <h4 className="text-xl md:text-2xl font-black text-gray-800">{rekapLayanan.kespro} <span className="text-[10px] md:text-xs font-medium text-gray-400">Pasien</span></h4>
                 </div>
               </div>
            </div>
 
-           <div className="bg-gradient-to-r from-pink-500 to-rose-500 p-8 rounded-3xl text-white shadow-lg flex justify-between items-center">
-              <div><p className="text-pink-100 font-medium mb-1">Total Pemasukan USG Bulan Ini</p><h2 className="text-4xl font-bold">{formatRupiah(rekapData.totalUang)}</h2></div>
-              <div className="text-right"><p className="text-pink-100 font-medium mb-1">Total Pasien Selesai</p><h2 className="text-4xl font-bold">{rekapData.totalPasien} Orang</h2></div>
+           <div className="bg-gradient-to-br md:bg-gradient-to-r from-pink-500 to-rose-500 p-6 md:p-8 rounded-3xl text-white shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0 w-full overflow-hidden">
+              <div>
+                <p className="text-pink-100 font-medium mb-1 text-xs md:text-base">Total Pemasukan USG Bulan Ini</p>
+                <h2 className="text-2xl md:text-4xl font-bold">{formatRupiah(rekapData.totalUang)}</h2>
+              </div>
+              <div className="md:text-right w-full md:w-auto border-t border-pink-400/50 md:border-none pt-4 md:pt-0">
+                <p className="text-pink-100 font-medium mb-1 text-xs md:text-base">Total Pasien Selesai</p>
+                <h2 className="text-2xl md:text-4xl font-bold">{rekapData.totalPasien} <span className="text-lg md:text-2xl font-normal opacity-80">Orang</span></h2>
+              </div>
            </div>
         </div>
       )}
@@ -474,70 +493,66 @@ export default function DataUSGPage() {
       {/* --- MODAL INPUT & EDIT MANUAL --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-           <div className="bg-white rounded-3xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <button onClick={closeModal} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"><XCircle size={24}/></button>
+           <div className="bg-white rounded-3xl w-full max-w-2xl p-5 md:p-6 shadow-2xl relative max-h-[95vh] overflow-y-auto">
+            <button onClick={closeModal} className="absolute top-4 right-4 md:top-6 md:right-6 text-gray-400 hover:text-gray-600 bg-gray-50 rounded-full p-1"><XCircle size={20} className="md:w-6 md:h-6"/></button>
             
-            {/* Judul Modal Dinamis */}
-            <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4 md:mb-6 flex items-center gap-2">
               <Activity className="text-pink-500"/> {editingId ? "Edit Data Pasien" : "Input Pasien Manual"}
             </h2>
             
-            <form onSubmit={handleSubmitPatient} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form onSubmit={handleSubmitPatient} className="space-y-3 md:space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Tanggal Reservasi</label>
-                  <input type="date" required value={newPatient.tanggal_reservasi} onChange={handleDateChange} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500" />
-                  {!editingId && newPatient.tanggal_reservasi && isWaktuHabis(newPatient.tanggal_reservasi) && (
-                    <p className="text-xs text-red-500 mt-2 font-bold">⚠️ Jam operasional hari ini telah lewat.</p>
-                  )}
+                  <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1">Tanggal Reservasi</label>
+                  <input type="date" required value={newPatient.tanggal_reservasi} onChange={handleDateChange} className="w-full px-3 py-2.5 md:px-4 md:py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Jam Operasional</label>
-                  <input type="text" readOnly value={newPatient.jam_reservasi || getJamOperasional(newPatient.tanggal_reservasi) || "Pilih tanggal valid"} className="w-full px-4 py-3 bg-pink-50 border border-pink-200 text-pink-700 font-bold rounded-xl outline-none cursor-not-allowed" />
+                  <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1">Jam Operasional</label>
+                  <input type="text" readOnly value={newPatient.jam_reservasi || getJamOperasional(newPatient.tanggal_reservasi) || "Pilih tanggal valid"} className="w-full px-3 py-2.5 md:px-4 md:py-3 bg-pink-50 border border-pink-200 text-pink-700 font-bold rounded-xl outline-none cursor-not-allowed text-sm" />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Nama Pasien</label>
-                  <input type="text" required value={newPatient.patient_name} onChange={(e) => setNewPatient({...newPatient, patient_name: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500" placeholder="Nama Lengkap" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1">Nama Pasien</label>
+                  <input type="text" required value={newPatient.patient_name} onChange={(e) => setNewPatient({...newPatient, patient_name: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 text-sm" placeholder="Nama Lengkap" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Umur</label>
-                  <input type="number" required value={newPatient.umur} onChange={(e) => setNewPatient({...newPatient, umur: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500" placeholder="Tahun" />
+                  <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1">Umur</label>
+                  <input type="number" required value={newPatient.umur} onChange={(e) => setNewPatient({...newPatient, umur: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 text-sm" placeholder="Tahun" />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Nama Suami</label>
-                  <input type="text" required value={newPatient.nama_suami} onChange={(e) => setNewPatient({...newPatient, nama_suami: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500" placeholder="Nama Suami" />
+                  <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1">Nama Suami</label>
+                  <input type="text" required value={newPatient.nama_suami} onChange={(e) => setNewPatient({...newPatient, nama_suami: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 text-sm" placeholder="Nama Suami" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">No WhatsApp</label>
-                  <input type="tel" required value={newPatient.phone} onChange={(e) => setNewPatient({...newPatient, phone: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500" placeholder="08..." />
+                  <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1">No WhatsApp</label>
+                  <input type="tel" required value={newPatient.phone} onChange={(e) => setNewPatient({...newPatient, phone: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 text-sm" placeholder="08..." />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Alamat</label>
-                <textarea required rows={2} value={newPatient.alamat} onChange={(e) => setNewPatient({...newPatient, alamat: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 resize-none" placeholder="Alamat lengkap" />
+                <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1">Alamat</label>
+                <textarea required rows={2} value={newPatient.alamat} onChange={(e) => setNewPatient({...newPatient, alamat: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 resize-none text-sm" placeholder="Alamat lengkap" />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Kehamilan Ke</label>
-                  <input type="number" required value={newPatient.kehamilan_ke} onChange={(e) => setNewPatient({...newPatient, kehamilan_ke: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500" min="1" />
+                  <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1">Kehamilan Ke</label>
+                  <input type="number" required value={newPatient.kehamilan_ke} onChange={(e) => setNewPatient({...newPatient, kehamilan_ke: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 text-sm" min="1" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1 flex justify-between">HPHT <span className="font-normal text-gray-400">(Opsional)</span></label>
-                  <input type="date" value={newPatient.hpht} onChange={(e) => setNewPatient({...newPatient, hpht: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 text-gray-700" />
+                  <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1 flex justify-between">HPHT <span className="font-normal text-gray-400">(Opsional)</span></label>
+                  <input type="date" value={newPatient.hpht} onChange={(e) => setNewPatient({...newPatient, hpht: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 text-gray-700 text-sm" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Pilih Paket USG</label>
-                <select required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500" value={newPatient.jenis_usg} onChange={(e) => {
+                <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1">Pilih Paket USG</label>
+                <select required className="w-full px-3 py-2.5 md:px-4 md:py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 text-sm" value={newPatient.jenis_usg} onChange={(e) => {
                     const sel = TARIF_USG.find(t => t.nama === e.target.value);
                     setNewPatient({...newPatient, jenis_usg: e.target.value, harga: sel ? sel.harga : 0});
                   }}>
@@ -546,10 +561,9 @@ export default function DataUSGPage() {
                 </select>
               </div>
 
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={closeModal} className="flex-1 px-4 py-3 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl font-bold transition-all">Batal</button>
-                {/* Teks Tombol Submit Dinamis */}
-                <button type="submit" className="flex-1 px-4 py-3 bg-pink-500 hover:bg-pink-600 text-white rounded-xl font-bold transition-all shadow-lg shadow-pink-500/30">
+              <div className="pt-4 flex flex-col sm:flex-row gap-2 md:gap-3">
+                <button type="button" onClick={closeModal} className="w-full sm:w-1/3 px-4 py-2.5 md:py-3 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl font-bold transition-all text-sm">Batal</button>
+                <button type="submit" className="w-full sm:w-2/3 px-4 py-2.5 md:py-3 bg-pink-500 hover:bg-pink-600 text-white rounded-xl font-bold transition-all shadow-lg shadow-pink-500/30 text-sm">
                   {editingId ? "Simpan Perubahan" : "Simpan Pasien Go-Show"}
                 </button>
               </div>
