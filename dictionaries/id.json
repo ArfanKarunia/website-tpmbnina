@@ -13,25 +13,27 @@
   },
   "about": {
     "title": "Tentang Kami",
-    "description": "TPMB Nina Rahayu berkomitmen memberikan layanan kesehatan ibu dan anak yang profesional dan terpercaya. Komitmen kami terhadap kualitas layanan juga dibuktikan melalui kerjasama strategis dengan ITSK Soepraoen Malang. Sebagai mitra pendidikan resmi, kami dipercaya menjadi tempat praktik (magang) bagi mahasiswi Kebidanan untuk mengasah kompetensi klinis mereka.",
-    "lead_role": "Bidan Utama & Pimpinan"
+    "description": "TPMB Nina Rahayu berkomitmen memberikan layanan kesehatan ibu dan anak beserta USG yang profesional dan terpercaya. Komitmen kami terhadap kualitas layanan juga dibuktikan melalui kerjasama strategis dengan ITSK Soepraoen Malang. Sebagai mitra pendidikan resmi, kami dipercaya menjadi tempat praktik (magang) bagi mahasiswi Kebidanan untuk mengasah kompetensi klinis mereka.",
+    "lead_role": "Bidan Utama & Pimpinan",
+    "doctor_role": "Dokter USG"
   },
   "services": {
     "title": "Layanan Unggulan",
     "items": [
       {
-        "title": "Pemeriksaan USG",
-        "desc": "Layanan USG dengan berbagai tipe (2D, 3D, 4D) oleh Dokter yang Bersertifikat untuk memantau perkembangan janin secara detail."
-      },
-      {
         "title": "Kesehatan Ibu & Anak",
         "desc": "Pemeriksaan Kesehatan Ibu dan Anak dengan pendekatan profesional, mulai dari kehamilan hingga tumbuh kembang balita."
+      },
+      {
+        "title": "Pemeriksaan USG",
+        "desc": "Layanan USG dengan berbagai tipe (2D, 3D, 4D) oleh Dokter yang Bersertifikat untuk memantau perkembangan janin secara detail."
       },
       {
         "title": "Keluarga Berencana (KB)",
         "desc": "Konsultasi dan pemasangan alat kontrasepsi KB (Suntik, Pil, Implan, IUD) sesuai kebutuhan keluarga."
       }
-    ]
+    ],
+    "cta": "Reservasi USG"
   },
   "partner": {
     "title": "Beberapa Mitra TPMB Nina Rahayu",

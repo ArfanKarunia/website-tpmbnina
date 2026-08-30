@@ -13,25 +13,27 @@
   },
   "about": {
     "title": "About Us",
-    "description": "TPMB Nina Rahayu is committed to providing professional and trusted maternal and child health services. Our commitment to service quality is also demonstrated through a strategic partnership with ITSK Soepraoen Malang. As an official educational partner, we are trusted as a clinical practice (internship) site for Midwifery students to hone their clinical competencies.",
-    "lead_role": "Head Midwife & Director"
+    "description": "TPMB Nina Rahayu is committed to providing professional and reliable maternal and child health services, including ultrasound examinations. Our commitment to service quality is further demonstrated through a strategic partnership with ITSK Soepraoen Malang; as an official educational partner, we serve as a clinical training site where midwifery students can hone their clinical competencies.",
+    "lead_role": "Head Midwife & Director",
+    "doctor_role": "Ultrasound Doctor"
   },
   "services": {
     "title": "Our Services",
     "items": [
       {
-        "title": "Pregnancy Checkup",
-        "desc": "Serving ultrasound with various types (2D, 3D, 4D) by Certified Doctors to monitor fetal development in detail."
-      },
-      {
         "title": "Maternal & Child Health",
         "desc": "Providing Maternal and Child Health Checks with a professional approach, from pregnancy to toddler development."
+      },
+      {
+        "title": "Pregnancy Checkup",
+        "desc": "Serving ultrasound with various types (2D, 3D, 4D) by Certified Doctors to monitor fetal development in detail."
       },
       {
         "title": "Family Planning (KB)",
         "desc": "Providing consultation and contraceptive installation (Injection, Pill, Implant, IUD) according to family needs."
       }
-    ]
+    ],
+    "cta": "Book Ultrasound"
   },
   "partner": {
     "title": "Our Partners",

@@ -6,13 +6,12 @@ import { motion, useInView, useAnimation } from "framer-motion";
 interface Props {
   children: React.ReactNode;
   width?: "fit-content" | "100%";
-  delay?: number; // Biar bisa diatur jedanya (staggered)
+  delay?: number; 
 }
 
 export const Reveal = ({ children, width = "fit-content", delay = 0.25 }: Props) => {
   const ref = useRef(null);
-  // useInView: Mendeteksi apakah elemen sudah masuk layar?
-  // once: true artinya animasinya cuma sekali aja (biar gak ngulang2 pas scroll naik turun)
+
   const isInView = useInView(ref, { once: true }); 
 
   const mainControls = useAnimation();

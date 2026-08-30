@@ -16,7 +16,7 @@ interface HeroProps {
 }
 
 const heroImages = [
-  "/assets/hero-bg.jpg",   
+  "/assets/hero-bg.webp",   
   "/assets/hero-bg1.jpg", 
 ];
 
@@ -51,14 +51,14 @@ export default function Hero({dict}: HeroProps) {
               alt={`Slide ${index + 1}`}
               fill
               priority
-              className="object-cover object-center scale-105"
+              className="object-cover object-center scale-100"
             />
           </motion.div>
         </AnimatePresence>
       </div>
 
       {/* 2. OVERLAY GRADIENT (TETAP SAMA) */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent z-10"></div>
+      <div className="absolute inset-0 bg-linear-to-r from-black/80 via-black/50 to-transparent z-10"></div>
 
       {/* 3. KONTEN TEKS */}
       <div className={`relative z-20 flex flex-col justify-center h-full w-full px-6 md:px-12 lg:px-20`}>
