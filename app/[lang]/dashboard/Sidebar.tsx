@@ -75,7 +75,7 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
         <div className="flex items-center justify-between mb-8 px-2 mt-2 h-10">
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10 shrink-0 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30">
-               <span>BT</span>
+               <span>SB</span>
             </div>
             <div className={`transition-all duration-300 whitespace-nowrap overflow-hidden
               ${isSidebarOpen 
@@ -83,7 +83,7 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
                 : "w-0 opacity-0 lg:w-0 lg:opacity-0 lg:group-hover:w-auto lg:group-hover:opacity-100"
               }
             `}>
-              <h1 className="text-lg font-bold text-gray-800 leading-tight">BidTics</h1>
+              <h1 className="text-lg font-bold text-gray-800 leading-tight">SIBIDAN</h1>
               <p className="text-[10px] text-gray-400">Dashboard Admin</p>
             </div>
           </div>

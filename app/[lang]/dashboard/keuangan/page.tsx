@@ -33,48 +33,87 @@ export default function KeuanganPage() {
   const [modalType, setModalType] = useState<"success" | "delete" | "confirm">("delete");
   const [deleteTarget, setDeleteTarget] = useState<{id: string, name: string} | null>(null);
 
-  // FILTER STATES
+  // 🔥 FILTER TANGGAL STATES (Otomatis Tanggal 1 s/d Hari Ini)
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+  const firstDay = today.substring(0, 8) + '01';
+
   const [isFilterOpen, setIsFilterOpen] = useState(false); 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
-  const [filterMonth, setFilterMonth] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' }).slice(0, 7)); 
+  const [startDate, setStartDate] = useState(firstDay); 
+  const [endDate, setEndDate] = useState(today); 
 
   // STATS STATE
   const [stats, setStats] = useState({ income: 0, expense: 0, net: 0 });
 
-  // 🔥 REKAP HARIAN STATES
+  // REKAP HARIAN STATES
   const [isRekapModalOpen, setIsRekapModalOpen] = useState(false);
-  const [rekapDate, setRekapDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' }));
+  const [rekapDate, setRekapDate] = useState(today);
   const [isExporting, setIsExporting] = useState(false);
 
+  // 🔥 FUNGSI FETCH DARI SUPABASE (Berdasarkan Rentang Tanggal)
   const fetchTransactions = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from("transactions")
-      .select("*")
-      .order("date", { ascending: false });
+    
+    let allFetchedData: Transaction[] = [];
+    let fetchMore = true;
+    let currPage = 0;
+    const PAGE_SIZE = 1000; // Batas aman default API Supabase
 
-    if (error) {
-      console.error("Error fetching transactions:", error);
-    } else {
-      setTransactions(data as Transaction[] || []);
+    // Looping di background untuk mengambil data per 1000 baris
+    while (fetchMore) {
+      let query = supabase
+        .from("transactions")
+        .select("*")
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .range(currPage * PAGE_SIZE, (currPage + 1) * PAGE_SIZE - 1); 
+
+      if (startDate) query = query.gte("date", startDate);
+      if (endDate) query = query.lte("date", endDate);
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Error fetching transactions:", error);
+        break; // Hentikan penarikan jika server error
+      }
+
+      if (data) {
+        allFetchedData = [...allFetchedData, ...(data as Transaction[])];
+        
+        if (data.length < PAGE_SIZE) {
+          fetchMore = false; 
+        } else {
+          currPage++; 
+        }
+      } else {
+        fetchMore = false;
+      }
     }
+
+    const uniqueData = Array.from(new Map(allFetchedData.map(item => [item.id, item])).values())
+
+    setTransactions(uniqueData);
     setIsLoading(false);
   };
 
-  useEffect(() => { fetchTransactions(); }, []);
+  // Jalankan Fetch otomatis jika Tanggal Mulai atau Tanggal Akhir berubah
+  useEffect(() => { 
+    fetchTransactions(); 
+  }, [startDate, endDate]);
 
-  // LOGIKA FILTERING
+  // LOGIKA FILTERING LOCAL (Pencarian Teks & Kategori)
   const filteredTransactions = useMemo(() => {
     return transactions.filter((t) => {
       const matchSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
       const matchCategory = filterCategory === "All" || t.category === filterCategory;
-      const matchMonth = filterMonth === "" || t.date.startsWith(filterMonth);
-      return matchSearch && matchCategory && matchMonth;
+      // Filter tanggal tidak perlu lagi disini karena sudah ditangani Supabase
+      return matchSearch && matchCategory;
     });
-  }, [transactions, searchTerm, filterCategory, filterMonth]);
+  }, [transactions, searchTerm, filterCategory]);
 
-  // HITUNG STATISTIK
+  // 🔥 HITUNG STATISTIK OTOMATIS BERDASARKAN RENTANG TANGGAL
   useEffect(() => {
     let totalIncome = 0;
     let totalExpense = 0;
@@ -91,7 +130,7 @@ export default function KeuanganPage() {
     });
   }, [filteredTransactions]);
 
-  // 🔥 LOGIKA REKAP HARIAN (DIHITUNG OTOMATIS)
+  // LOGIKA REKAP HARIAN (DIHITUNG OTOMATIS)
   const dailyRecap = useMemo(() => {
     const dailyData = transactions.filter(t => t.date === rekapDate);
     
@@ -106,12 +145,10 @@ export default function KeuanganPage() {
       if (t.type === 'in') {
         income += Number(t.amount);
         const patientNameStr = t.description.replace("Jasa: ", "").replace("Obat: ", "").trim();
-        // Menghitung jumlah pasien dari label Jasa
         if (t.description.includes('(Umum (BP))')) uniqueUmum.add(patientNameStr);
         else if (t.description.includes('(KIA - BPJS)')) uniqueKiaBpjs.add(patientNameStr);
         else if (t.description.includes('(KIA - Non BPJS)')) uniqueKiaNonBpjs.add(patientNameStr);
       } else {
-        // Memecah kategori pengeluaran
         if (t.category === 'Obat & Vitamin' || t.category === 'Alat Kesehatan') {
           expObatAlkes += Number(t.amount);
         } else {
@@ -132,13 +169,11 @@ export default function KeuanganPage() {
     };
   }, [transactions, rekapDate]);
 
-  // 🔥 FUNGSI EXPORT EXCEL
+  // FUNGSI EXPORT EXCEL
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
       const XLSX = await import("xlsx");
-      
-      // Membuat format baris-baris Excel
       const wsData = [
         ["LAPORAN KEUANGAN HARIAN - TPMB NINA RAHAYU"],
         ["Tanggal:", new Date(rekapDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })],
@@ -162,7 +197,6 @@ export default function KeuanganPage() {
         ["Tipe", "Kategori", "Keterangan", "Jumlah (Rp)"]
       ];
 
-      // Menambahkan rincian transaksi di bawah ringkasan
       dailyRecap.dailyData.forEach(t => {
         wsData.push([
           t.type === 'in' ? 'Pemasukan' : 'Pengeluaran',
@@ -173,10 +207,7 @@ export default function KeuanganPage() {
       });
 
       const ws = XLSX.utils.aoa_to_sheet(wsData);
-      
-      // Styling lebar kolom
       ws['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 40 }, { wch: 15 }];
-      
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Rekap_Harian");
       XLSX.writeFile(wb, `Rekap_Harian_${rekapDate}.xlsx`);
@@ -187,7 +218,7 @@ export default function KeuanganPage() {
     }
   };
 
-  // HAPUS DATA
+  // HAPUS & EDIT DATA
   const handleDeleteClick = (id: string, description: string) => {
     setDeleteTarget({ id, name: description });
     setModalType("delete"); 
@@ -226,14 +257,20 @@ export default function KeuanganPage() {
     return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(num);
   };
 
+  // Helper untuk cetak tanggal cantik di Header
+  const printDate = (dateStr: string) => {
+    if(!dateStr) return "-";
+    return new Date(dateStr).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Laporan Keuangan</h1>
-          <p className="text-gray-500 text-sm">
-             Laporan Bulan: <span className="font-bold text-gray-700">{filterMonth ? filterMonth : "Semua Periode"}</span>
+          <p className="text-gray-500 text-sm mt-1">
+             Periode: <span className="font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md">{printDate(startDate)} - {printDate(endDate)}</span>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -250,7 +287,6 @@ export default function KeuanganPage() {
             <Filter size={18} /> Filter
           </button>
 
-          {/* 🔥 TOMBOL REKAP HARIAN BARU */}
           <button onClick={() => setIsRekapModalOpen(true)} className="flex items-center gap-2 bg-pink-100 text-pink-700 border border-pink-200 px-4 py-2.5 rounded-xl hover:bg-pink-200 transition-colors text-sm font-bold">
             <Receipt size={18} /> Rekap Harian
           </button>
@@ -261,7 +297,7 @@ export default function KeuanganPage() {
         </div>
       </div>
 
-      {/* FILTER PANEL */}
+      {/* 🔥 FILTER PANEL (DIPERBARUI) */}
       {isFilterOpen && (
         <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm animate-in fade-in slide-in-from-top-2">
            <div className="flex flex-col md:flex-row gap-4 items-end">
@@ -272,11 +308,19 @@ export default function KeuanganPage() {
                     <input type="text" placeholder="Cari nama..." className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                  </div>
               </div>
-              <div className="w-full md:w-1/4">
-                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Periode Bulan</label>
-                 <input type="month" className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} />
+              
+              <div className="w-full md:w-1/3 flex gap-2">
+                 <div className="w-1/2">
+                   <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Dari Tanggal</label>
+                   <input type="date" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-700" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                 </div>
+                 <div className="w-1/2">
+                   <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Sampai Tanggal</label>
+                   <input type="date" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-700" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                 </div>
               </div>
-              <div className="w-full md:w-1/4">
+
+              <div className="w-full md:w-1/3">
                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Kategori</label>
                  <select className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
                     <option value="All">Semua Kategori</option>
@@ -287,7 +331,7 @@ export default function KeuanganPage() {
                     <option value="Maintenance">Maintenance</option>
                  </select>
               </div>
-              <button onClick={() => { setSearchTerm(""); setFilterCategory("All"); setFilterMonth(""); }} className="px-4 py-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors text-sm font-medium">Reset</button>
+              <button onClick={() => { setSearchTerm(""); setFilterCategory("All"); setStartDate(firstDay); setEndDate(today); }} className="px-4 py-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors text-sm font-medium">Reset</button>
            </div>
         </div>
       )}
@@ -337,7 +381,7 @@ export default function KeuanganPage() {
               ) : filteredTransactions.length > 0 ? (
                 filteredTransactions.map((trx) => (
                   <tr key={trx.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-6 py-4 text-gray-500 w-32">
+                    <td className="px-6 py-4 text-gray-500 w-32 whitespace-nowrap">
                       {new Date(trx.date).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="px-6 py-4">
@@ -370,14 +414,14 @@ export default function KeuanganPage() {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic">Data tidak ditemukan sesuai filter.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic">Data tidak ditemukan sesuai filter rentang tanggal.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* 🔥 MODAL REKAP HARIAN */}
+      {/* MODAL REKAP HARIAN */}
       {isRekapModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200 overflow-hidden">

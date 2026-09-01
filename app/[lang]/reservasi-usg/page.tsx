@@ -6,14 +6,14 @@ import { User, Phone, Calendar, CheckCircle2, AlertCircle, Activity, MapPin, Hea
 
 const TARIF_USG = [
   { nama: "2D (Hitam Putih)", harga: 100000 },
-  { nama: "2D (Berwarna)", harga: 120000 },
+  { nama: "2D (Berwarna)", harga: 130000 },
   { nama: "Cek IUD", harga: 120000 },
   { nama: "Kesehatan Produksi", harga: 120000 },
   { nama: "Program Kehamilan", harga: 120000 },
   { nama: "3D (Hitam Putih)", harga: 150000 },
-  { nama: "3D (Berwarna)", harga: 180000 },
+  { nama: "3D (Berwarna)", harga: 200000 },
   { nama: "4D (Hitam Putih)", harga: 220000 },
-  { nama: "4D (Berwarna)", harga: 250000 },
+  { nama: "4D (Berwarna)", harga: 280000 },
 ];
 
 export default function ReservasiUSGPublic() {
@@ -57,7 +57,7 @@ export default function ReservasiUSGPublic() {
     if (day === 2) return "15.00 - 17.00 WIB";
     if (day === 5) return "13.00 - 15.00 WIB";
     if (day === 6) return "14.00 - 16.00 WIB";
-    if (day === 0) return "15.00 - 17.00 WIB";
+    if (day === 0) return "14.00 - 16.00 WIB";
     return ""; 
   };
 
@@ -80,7 +80,7 @@ export default function ReservasiUSGPublic() {
     if (day === 2) closingTime = 17.00; 
     if (day === 5) closingTime = 15.00; 
     if (day === 6) closingTime = 16.00; 
-    if (day === 0) closingTime = 17.00; 
+    if (day === 0) closingTime = 16.00; 
 
     return currentTime >= closingTime;
   };
