@@ -5,7 +5,9 @@ import Image from "next/image";
 import { Menu, Bell } from "lucide-react";
 import { Poppins } from "next/font/google";
 import Sidebar from "./Sidebar";
-import { createClient } from "@/app/utils/supabase/client"; // Import Supabase
+import SplashScreen from "@/app/components/SplashScreen"; 
+import { AnimatePresence } from "framer-motion";
+import { createClient } from "@/app/utils/supabase/client";
 
 const poppins = Poppins({
   weight: ["400", "500", "600", "700"],
@@ -21,6 +23,10 @@ export default function DashboardLayout({
   
   // State untuk menyimpan role dari database
   const [userRole, setUserRole] = useState<string | null>(null);
+  
+  // State untuk mengontrol kemunculan Splash Screen
+  const [isAppLoading, setIsAppLoading] = useState(true); 
+  
   const supabase = createClient();
 
   // Menarik role user saat layout dimuat
@@ -38,7 +44,12 @@ export default function DashboardLayout({
           setUserRole(data.role);
         }
       }
+
+      setTimeout(() => {
+        setIsAppLoading(false);
+      }, 1500);
     };
+    
     fetchUserRole();
   }, [supabase]);
 
@@ -51,6 +62,11 @@ export default function DashboardLayout({
   return (
     <div className={`flex min-h-screen bg-gray-100 ${poppins.className}`}>
       
+      {/* 🔥 ANIMASI SPLASH SCREEN (Keluar perlahan saat isAppLoading false) */}
+      <AnimatePresence>
+        {isAppLoading && <SplashScreen key="splash" />}
+      </AnimatePresence>
+
       {/* PANGGIL KOMPONEN SIDEBAR DI SINI */}
       <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image"; // 🔥 Tambahan import Image
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import { 
@@ -16,7 +17,6 @@ import {
   X 
 } from "lucide-react";
 
-// Definisikan props agar state open/close bisa dioper dari Layout
 interface SidebarProps {
   isSidebarOpen: boolean;
   setIsSidebarOpen: (isOpen: boolean) => void;
@@ -28,7 +28,6 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
   const supabase = createClient();
   const [userRole, setUserRole] = useState<string | null>(null);
 
-  // Ambil Role User dari Supabase Profiles
   useEffect(() => {
     const fetchUserRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -53,7 +52,6 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
     router.refresh();
   };
 
-  // Daftar Menu Utama
   const mainMenus = [
     { name: "Beranda", href: "/dashboard", icon: LayoutDashboard },
     { name: "Pelayanan", href: "/dashboard/pelayanan", icon: Stethoscope },
@@ -74,8 +72,15 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
         {/* Logo */}
         <div className="flex items-center justify-between mb-8 px-2 mt-2 h-10">
           <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10 shrink-0 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30">
-               <span>SB</span>
+            {/* 🔥 PERBAIKAN: Menggunakan Logo Gambar SIBIDAN */}
+            <div className="relative w-10 h-10 shrink-0 flex items-center justify-center">
+               <Image 
+                 src="/assets/logoSIBIDAN.png" 
+                 alt="Logo SIBIDAN"
+                 fill
+                 className="object-contain"
+                 priority
+               />
             </div>
             <div className={`transition-all duration-300 whitespace-nowrap overflow-hidden
               ${isSidebarOpen 
@@ -121,9 +126,6 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
             );
           })}
 
-          {/* ========================================= */}
-          {/* MENU BARU 1: DATA USG (SEMUA BISA AKSES) */}
-          {/* ========================================= */}
           <li className="relative group mt-4 pt-4 border-t border-gray-100">
             <Link
               href="/dashboard/data-usg"
@@ -138,9 +140,6 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
             </Link>
           </li>
 
-          {/* ========================================= */}
-          {/* MENU BARU 2: KEUANGAN USG (KHUSUS OWNER) */}
-          {/* ========================================= */}
           {userRole === "owner" && (
             <li className="relative group">
               <Link
