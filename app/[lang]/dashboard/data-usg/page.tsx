@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/app/utils/supabase/client";
 import { 
   Search, Plus, Calendar, Clock, CheckCircle2, XCircle, 
-  Users, Phone, Activity, AlertTriangle, CalendarDays, BarChart3, Pencil, Stethoscope
+  Users, Phone, Activity, AlertTriangle, CalendarDays, BarChart3, Pencil, Stethoscope, CalendarOff
 } from "lucide-react";
 
 interface USGPasien {
@@ -45,6 +45,12 @@ export default function DataUSGPage() {
   const [activeTab, setActiveTab] = useState<"harian" | "rekap">("harian");
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]); 
 
+  const [closedDays, setClosedDays] = useState<string[]>([]);
+  const [isLiburModalOpen, setIsLiburModalOpen] = useState(false);
+  const [liburReason, setLiburReason] = useState("Dokter berhalangan hadir");
+  const [liburStartDate, setLiburStartDate] = useState(selectedDate);
+  const [liburEndDate, setLiburEndDate] = useState(selectedDate);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null); 
   
@@ -64,6 +70,7 @@ export default function DataUSGPage() {
   };
 
   const isHariBuka = (dateString: string) => {
+    if (closedDays.includes(dateString)) return false;
     return getJamOperasional(dateString) !== "";
   };
   const hariIniBuka = isHariBuka(selectedDate);
@@ -93,6 +100,11 @@ export default function DataUSGPage() {
     setNewPatient({ ...newPatient, tanggal_reservasi: date, jam_reservasi: getJamOperasional(date) });
   };
 
+  const fetchClosedDays = async () => {
+    const { data } = await supabase.from("usg_closed_days").select("date");
+    if (data) setClosedDays(data.map(d => d.date));
+  };
+
   const fetchPatients = async () => {
     setLoading(true);
     let query = supabase.from("usg_reservations").select("*");
@@ -114,6 +126,7 @@ export default function DataUSGPage() {
   };
 
   useEffect(() => {
+    fetchClosedDays();
     fetchPatients();
     setNewPatient(prev => ({ ...prev, tanggal_reservasi: selectedDate, jam_reservasi: getJamOperasional(selectedDate) }));
   }, [selectedDate, activeTab]);
@@ -150,11 +163,59 @@ export default function DataUSGPage() {
     });
   };
 
+  const handleToggleLiburClick = async () => {
+    if (closedDays.includes(selectedDate)) {
+      await supabase.from("usg_closed_days").delete().eq("date", selectedDate);
+      fetchClosedDays();
+    } else {
+      setLiburStartDate(selectedDate);
+      setLiburEndDate(selectedDate);
+      setLiburReason("Dokter berhalangan hadir");
+      setIsLiburModalOpen(true);
+    }
+  };
+
+  const getDatesInRange = (start: string, end: string) => {
+    const dateArray = [];
+    let currentDate = new Date(start);
+    const stopDate = new Date(end);
+    while (currentDate <= stopDate) {
+      dateArray.push(currentDate.toISOString().split('T')[0]);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    return dateArray;
+  };
+
+  const submitLiburReason = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (new Date(liburEndDate) < new Date(liburStartDate)) {
+      alert("Tanggal Selesai tidak boleh lebih awal dari Tanggal Mulai.");
+      return;
+    }
+
+    const datesToClose = getDatesInRange(liburStartDate, liburEndDate);
+    
+    const payload = datesToClose.map(date => ({
+      date: date,
+      reason: liburReason
+    }));
+
+    const { error } = await supabase.from("usg_closed_days").upsert(payload, { onConflict: 'date' });
+    
+    if (error) {
+      alert("Gagal menyimpan data libur: " + error.message);
+    } else {
+      setIsLiburModalOpen(false);
+      fetchClosedDays();
+    }
+  };
+
   const handleSubmitPatient = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!isHariBuka(newPatient.tanggal_reservasi)) {
-        alert("Gagal! Hari yang dipilih bukan jadwal USG."); return;
+        alert("Gagal! Hari yang dipilih tidak melayani USG."); return;
     }
 
     if (!editingId && isWaktuHabis(newPatient.tanggal_reservasi)) {
@@ -207,6 +268,13 @@ export default function DataUSGPage() {
       }
 
     } else {
+      const isDuplicate = patients.some(p => p.phone === newPatient.phone && p.tanggal_reservasi === newPatient.tanggal_reservasi && p.status !== 'batal');
+      
+      if (isDuplicate) {
+          alert("Pendaftaran ditolak! Nomor WhatsApp ini sudah terdaftar pada antrian hari ini.");
+          return;
+      }
+
       const antrianHariItu = patients.filter(p => p.tanggal_reservasi === newPatient.tanggal_reservasi && p.status !== 'batal');
       if (antrianHariItu.length >= 25) {
           alert("Penuh! Kuota 25 pasien untuk hari ini sudah habis."); return;
@@ -273,10 +341,8 @@ export default function DataUSGPage() {
   const { rekap: rekapData, rekapLayanan } = generateRekapBulanan();
 
   return (
-    // 🔥 PERBAIKAN: Penambahan min-w-0 pada wrapper terluar agar tabel tidak bisa menjebol layout
     <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto w-full min-w-0">
       
-      {/* HEADER & FILTER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -295,7 +361,6 @@ export default function DataUSGPage() {
         </div>
       </div>
 
-      {/* FILTER TANGGAL & GO SHOW */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
             <span className="text-sm font-bold text-gray-600 shrink-0">Pilih Waktu:</span>
@@ -307,10 +372,22 @@ export default function DataUSGPage() {
             />
          </div>
           
-          {activeTab === "harian" && hariIniBuka && (
-            <button onClick={() => { setEditingId(null); setIsModalOpen(true); }} className="w-full sm:w-auto sm:ml-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md shrink-0">
-              <Plus size={18} /> Pasien Go-Show
-            </button>
+          {activeTab === "harian" && (
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:ml-auto">
+              <button 
+                onClick={handleToggleLiburClick} 
+                className={`w-full sm:w-auto px-4 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md shrink-0 
+                ${closedDays.includes(selectedDate) ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'}`}
+              >
+                <CalendarOff size={18} /> {closedDays.includes(selectedDate) ? "Buka Jadwal" : "Tandai Libur"}
+              </button>
+
+              {hariIniBuka && (
+                <button onClick={() => { setEditingId(null); setIsModalOpen(true); }} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md shrink-0">
+                  <Plus size={18} /> Pasien Go-Show
+                </button>
+              )}
+            </div>
           )}
       </div>
 
@@ -319,17 +396,18 @@ export default function DataUSGPage() {
           <AlertTriangle size={24} className="shrink-0 mt-0.5" />
           <div className="w-full">
             <h4 className="font-bold text-sm md:text-base">USG Tutup pada hari ini.</h4>
-            <p className="text-xs md:text-sm mt-1">Pelayanan USG hanya tersedia di hari <b>Selasa, Jumat, Sabtu, dan Minggu</b>.</p>
+            <p className="text-xs md:text-sm mt-1">
+              {closedDays.includes(selectedDate) 
+                ? "Jadwal USG pada tanggal ini telah ditutup secara manual oleh Admin." 
+                : "Pelayanan USG hanya tersedia di hari Selasa, Jumat, Sabtu, dan Minggu."}
+            </p>
           </div>
         </div>
       )}
 
-      {/* --- TABEL ANTRIAN HARIAN --- */}
       {activeTab === "harian" && (
-        // 🔥 PERBAIKAN: Mengurung seluruh section harian di dalam Grid 1 Kolom
         <div className="grid grid-cols-1 gap-4 w-full min-w-0">
           
-          {/* INDIKATOR KUOTA & STATUS */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 w-full">
             <div className="bg-white p-3 md:p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
               <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><Users size={20} className="md:w-6 md:h-6"/></div>
@@ -349,7 +427,6 @@ export default function DataUSGPage() {
             </div>
           </div>
 
-          {/* 🔥 TABLE WRAPPER YANG AMAN */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden w-full min-w-0">
             <div className="overflow-x-auto w-full">
               <table className="w-full text-left border-collapse min-w-[700px]">
@@ -411,7 +488,6 @@ export default function DataUSGPage() {
         </div>
       )}
 
-      {/* --- TAB REKAP BULANAN --- */}
       {activeTab === "rekap" && (
         <div className="space-y-6 w-full">
            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
@@ -490,7 +566,6 @@ export default function DataUSGPage() {
         </div>
       )}
 
-      {/* --- MODAL INPUT & EDIT MANUAL --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
            <div className="bg-white rounded-3xl w-full max-w-2xl p-5 md:p-6 shadow-2xl relative max-h-[95vh] overflow-y-auto">
@@ -566,6 +641,62 @@ export default function DataUSGPage() {
                 <button type="submit" className="w-full sm:w-2/3 px-4 py-2.5 md:py-3 bg-pink-500 hover:bg-pink-600 text-white rounded-xl font-bold transition-all shadow-lg shadow-pink-500/30 text-sm">
                   {editingId ? "Simpan Perubahan" : "Simpan Pasien Go-Show"}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isLiburModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md p-5 md:p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <button onClick={() => setIsLiburModalOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-50 rounded-full p-1"><XCircle size={20}/></button>
+            
+            <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+              <CalendarOff className="text-red-500"/> Tandai Libur / Tutup
+            </h2>
+            <p className="text-sm text-gray-500 mb-6">Tentukan rentang tanggal libur beserta alasannya.</p>
+            
+            <form onSubmit={submitLiburReason} className="space-y-4">
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1">Mulai Tanggal</label>
+                  <input 
+                    type="date" 
+                    required 
+                    value={liburStartDate} 
+                    onChange={(e) => setLiburStartDate(e.target.value)} 
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-sm" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1">Sampai Tanggal</label>
+                  <input 
+                    type="date" 
+                    required 
+                    value={liburEndDate} 
+                    onChange={(e) => setLiburEndDate(e.target.value)} 
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-sm" 
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs md:text-sm font-bold text-gray-700 mb-2">Alasan Libur</label>
+                <input 
+                  type="text" 
+                  required 
+                  value={liburReason} 
+                  onChange={(e) => setLiburReason(e.target.value)} 
+                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-sm mb-3" 
+                  placeholder="Contoh: Dokter berhalangan hadir" 
+                />
+              </div>
+
+              <div className="pt-4 flex gap-2 border-t border-gray-100">
+                <button type="button" onClick={() => setIsLiburModalOpen(false)} className="w-1/3 px-4 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl font-bold transition-all text-sm">Batal</button>
+                <button type="submit" className="w-2/3 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition-all shadow-lg shadow-red-500/30 text-sm">Simpan Libur</button>
               </div>
             </form>
           </div>

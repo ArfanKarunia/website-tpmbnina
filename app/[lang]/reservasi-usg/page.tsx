@@ -22,6 +22,8 @@ export default function ReservasiUSGPublic() {
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [noAntrianFix, setNoAntrianFix] = useState(0); 
+
+  const [closedDays, setClosedDays] = useState<{date: string, reason: string}[]>([]);
   
   const [newPatient, setNewPatient] = useState({
     kode_referensi: "", 
@@ -29,13 +31,18 @@ export default function ReservasiUSGPublic() {
     tanggal_reservasi: "", jam_reservasi: "", kehamilan_ke: "", hpht: "", jenis_usg: "", harga: 0,
   });
 
-  // 🔥 LOGIKA PENANGKAP KODE REFERENSI OTOMATIS DARI LINK
+  
   useEffect(() => {
-    // Membaca URL saat ini (misal: .../reservasi-usg?ref=K01)
+    const fetchClosedDays = async () => {
+      const { data } = await supabase.from("usg_closed_days").select("date, reason");
+      if (data) setClosedDays(data);
+    };
+    fetchClosedDays();
+  }, [supabase]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const refCode = params.get("ref");
-    
-    // Jika ada refCode, diam-diam simpan ke state tanpa sepengetahuan pasien
     if (refCode) {
       setNewPatient(prev => ({ ...prev, kode_referensi: refCode.toUpperCase() }));
     }
@@ -48,7 +55,6 @@ export default function ReservasiUSGPublic() {
   
   const formatRupiah = (angka: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(angka);
 
-  // --- LOGIKA HARI BUKA & JAM OPERASIONAL ---
   const getJamOperasional = (dateString: string) => {
     if (!dateString) return "";
     const [y, m, d] = dateString.split('-');
@@ -86,7 +92,13 @@ export default function ReservasiUSGPublic() {
   };
 
   const isHariBuka = (dateString: string) => {
+    if (closedDays.some(d => d.date === dateString)) return false;
     return getJamOperasional(dateString) !== "";
+  };
+
+  const getLiburReason = (dateString: string) => {
+    const closedData = closedDays.find(d => d.date === dateString);
+    return closedData ? closedData.reason : "";
   };
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,8 +112,24 @@ export default function ReservasiUSGPublic() {
     setLoading(true); setErrorMsg("");
 
     try {
+      const liburManual = closedDays.find(d => d.date === newPatient.tanggal_reservasi);
+      if (liburManual) {
+         throw new Error(`Pendaftaran ditolak. Klinik tutup pada tanggal tersebut karena: ${liburManual.reason}`);
+      }
       if (!isHariBuka(newPatient.tanggal_reservasi)) throw new Error("Pelayanan USG hanya tersedia di hari Selasa, Jumat, Sabtu, dan Minggu.");
       if (isWaktuHabis(newPatient.tanggal_reservasi)) throw new Error("Jam operasional USG untuk hari ini sudah berakhir. Silakan pilih hari lain.");
+
+      const { data: duplicateData } = await supabase
+        .from("usg_reservations")
+        .select("no_antrian")
+        .eq("tanggal_reservasi", newPatient.tanggal_reservasi)
+        .eq("phone", newPatient.phone)
+        .neq("status", "batal")
+        .single(); 
+      
+      if (duplicateData) {
+        throw new Error(`Anda sudah melakukan reservasi untuk tanggal ini dengan Nomor Antrian: ${duplicateData.no_antrian}`);
+      }
 
       const { data: antrianCount, error: countError } = await supabase
         .from("usg_reservations").select("id").eq("tanggal_reservasi", newPatient.tanggal_reservasi).neq("status", "batal"); 
@@ -122,7 +150,6 @@ export default function ReservasiUSGPublic() {
         nextAntrian = maxAntrian + 1;
       }
 
-      // 🔥 SIMPAN KODE REFERENSI KE DATABASE
       const { error: insertError } = await supabase.from("usg_reservations").insert([{
           kode_referensi: newPatient.kode_referensi ? newPatient.kode_referensi.toUpperCase() : null,
           patient_name: newPatient.patient_name, umur: parseInt(newPatient.umur), nama_suami: newPatient.nama_suami,
@@ -137,9 +164,6 @@ export default function ReservasiUSGPublic() {
       setNoAntrianFix(nextAntrian);
       setSuccess(true);
 
-      // ==========================================
-      // 🚀 TELEGRAM NOTIFICATION SENDER 
-      // ==========================================
       const sendTelegramNotif = async () => {
         const TELEGRAM_TOKEN = "8446632244:AAG461X_q3poobfwH872tGm4299Zp8nwzd0";
         const CHAT_ID = "-5155147505";
@@ -150,7 +174,6 @@ export default function ReservasiUSGPublic() {
         }
         const waLink = `https://wa.me/${formattedPhone}`;
         
-        // 🔥 Tambahkan Kode Referensi di Notif Telegram (jika ada)
         const refText = newPatient.kode_referensi ? `\n*Referensi:* ${newPatient.kode_referensi.toUpperCase()}` : '';
         const message = `🚨 *PASIEN USG BARU MASUK* 🚨${refText}\n\n*Nama:* ${newPatient.patient_name}\n*Kontak:* [Chat WhatsApp Sekarang](${waLink})\n*Layanan:* ${newPatient.jenis_usg}\n*Jadwal:* ${new Date(newPatient.tanggal_reservasi).toLocaleDateString('id-ID')} (${newPatient.jam_reservasi})\n*No. Antrian:* ${nextAntrian}\n\n_Mohon staf bersiap di jam tersebut._`
         
@@ -173,7 +196,6 @@ export default function ReservasiUSGPublic() {
       };
 
       await sendTelegramNotif();
-      // ==========================================
 
     } catch (err: any) {
       setErrorMsg(err.message || "Terjadi kesalahan sistem. Silakan coba lagi nanti.");
@@ -216,14 +238,13 @@ export default function ReservasiUSGPublic() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-pink-50/50 p-4 font-sans py-8 md:py-12 relative overflow-hidden">
       
-      {/* Background Ornament */}
       <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-pink-200 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob animation-delay-2000"></div>
 
       <div className="bg-white w-full max-w-2xl p-5 md:p-8 rounded-3xl shadow-xl border border-white/50 backdrop-blur-sm relative z-10">
         
         <div className="text-center mb-6 md:mb-8 pb-5 md:pb-6 border-b border-gray-100 relative">
-                    
+                  
           <div className="w-14 h-14 md:w-16 md:h-16 bg-pink-100 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 mt-6 md:mt-0"><Activity size={28} className="text-pink-600" /></div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-800">Form Reservasi USG</h1>
           <p className="text-gray-500 text-xs md:text-sm mt-1 md:mt-2">Klinik TPMB Nina Rahayu</p>
@@ -242,7 +263,13 @@ export default function ReservasiUSGPublic() {
                 <input type="date" required min={minDate} value={newPatient.tanggal_reservasi} onChange={handleDateChange} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-gray-700 text-sm md:text-base appearance-none" />
               </div>
               
-              {newPatient.tanggal_reservasi && !isHariBuka(newPatient.tanggal_reservasi) && (
+              {newPatient.tanggal_reservasi && closedDays.some(d => d.date === newPatient.tanggal_reservasi) && (
+                <p className="text-xs text-red-500 mt-2 font-medium bg-red-50 p-2 rounded-lg border border-red-100">
+                  ⚠️ Tutup: {getLiburReason(newPatient.tanggal_reservasi)}
+                </p>
+              )}
+
+              {newPatient.tanggal_reservasi && !closedDays.some(d => d.date === newPatient.tanggal_reservasi) && !isHariBuka(newPatient.tanggal_reservasi) && (
                 <p className="text-xs text-red-500 mt-2 font-medium">⚠️ Tanggal ini bukan jadwal buka USG.</p>
               )}
               
