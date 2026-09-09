@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image"; // 🔥 Tambahan import Image
+import Image from "next/image"; 
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import { 
@@ -14,7 +14,8 @@ import {
   Import,
   ClipboardList,
   LogOut, 
-  X 
+  X,
+  ShieldCheck 
 } from "lucide-react";
 
 interface SidebarProps {
@@ -47,6 +48,7 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
   }, [supabase]);
 
   const handleLogout = async () => {
+    sessionStorage.removeItem("staff_verified");
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
@@ -72,7 +74,6 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
         {/* Logo */}
         <div className="flex items-center justify-between mb-8 px-2 mt-2 h-10">
           <div className="flex items-center gap-3">
-            {/* 🔥 PERBAIKAN: Menggunakan Logo Gambar SIBIDAN */}
             <div className="relative w-10 h-10 shrink-0 flex items-center justify-center">
                <Image 
                  src="/assets/logoSIBIDAN.png" 
@@ -141,19 +142,35 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
           </li>
 
           {userRole === "owner" && (
-            <li className="relative group">
-              <Link
-                href="/dashboard/keuangan-usg"
-                className={`flex items-center p-3 rounded-xl transition-all duration-200
-                  ${pathname.includes("/dashboard/keuangan-usg") ? "bg-pink-50 text-pink-600 shadow-sm font-semibold" : "text-gray-500 hover:bg-pink-50 hover:text-pink-600"}
-                `}
-              >
-                <Wallet size={22} className={`shrink-0 ${pathname.includes("/dashboard/keuangan-usg") ? "text-pink-600" : "text-gray-400"}`} />
-                <span className={`ml-3 whitespace-nowrap transition-all duration-300 overflow-hidden ${isSidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0 hidden"}`}>
-                    Keuangan USG
-                </span>
-              </Link>
-            </li>
+            <>
+              <li className="relative group">
+                <Link
+                  href="/dashboard/keuangan-usg"
+                  className={`flex items-center p-3 rounded-xl transition-all duration-200
+                    ${pathname.includes("/dashboard/keuangan-usg") ? "bg-pink-50 text-pink-600 shadow-sm font-semibold" : "text-gray-500 hover:bg-pink-50 hover:text-pink-600"}
+                  `}
+                >
+                  <Wallet size={22} className={`shrink-0 ${pathname.includes("/dashboard/keuangan-usg") ? "text-pink-600" : "text-gray-400"}`} />
+                  <span className={`ml-3 whitespace-nowrap transition-all duration-300 overflow-hidden ${isSidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0 hidden"}`}>
+                      Keuangan USG
+                  </span>
+                </Link>
+              </li>
+
+              <li className="relative group">
+                <Link
+                  href="/dashboard/kelola-staff"
+                  className={`flex items-center p-3 rounded-xl transition-all duration-200
+                    ${pathname.includes("/dashboard/kelola-staff") ? "bg-pink-50 text-pink-600 shadow-sm font-semibold" : "text-gray-500 hover:bg-pink-50 hover:text-pink-600"}
+                  `}
+                >
+                  <ShieldCheck size={22} className={`shrink-0 ${pathname.includes("/dashboard/kelola-staf") ? "text-pink-600" : "text-gray-400"}`} />
+                  <span className={`ml-3 whitespace-nowrap transition-all duration-300 overflow-hidden ${isSidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0 hidden"}`}>
+                      Kelola Staf
+                  </span>
+                </Link>
+              </li>
+            </>
           )}
         </ul>
 
