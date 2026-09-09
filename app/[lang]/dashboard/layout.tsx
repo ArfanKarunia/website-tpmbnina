@@ -35,13 +35,21 @@ export default function DashboardLayout({
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data, error } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-
-        if (data && !error) {
-          setUserRole(data.role);
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+        
+      if (data && !error) {
+        setUserRole(data.role);
+        
+        if (data.role === "staff") {
+            const isVerified = sessionStorage.getItem("staff_verified");
+            if (!isVerified) {
+              await supabase.auth.signOut(); 
+              window.location.href = "/login";
+            }
+          }
         }
       }
 
