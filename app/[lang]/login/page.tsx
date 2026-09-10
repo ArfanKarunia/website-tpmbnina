@@ -57,6 +57,13 @@ export default function LoginPage() {
         return; 
       }
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.user_metadata?.pwd_version) {
+        localStorage.setItem('local_pwd_version', user.user_metadata.pwd_version.toString());
+      } else {
+        localStorage.setItem('local_pwd_version', '0'); 
+      }
+
       router.push("/dashboard"); 
       router.refresh();
       
@@ -66,10 +73,18 @@ export default function LoginPage() {
     }
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (inputOtp === generatedOtp) {
       sessionStorage.setItem('staff_verified', 'true'); 
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.user_metadata?.pwd_version) {
+        localStorage.setItem('local_pwd_version', user.user_metadata.pwd_version.toString());
+      } else {
+        localStorage.setItem('local_pwd_version', '0'); 
+      }
+
       router.push("/dashboard");
       router.refresh();
     } else {

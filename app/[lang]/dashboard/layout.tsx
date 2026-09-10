@@ -20,34 +20,41 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  
-  // State untuk menyimpan role dari database
   const [userRole, setUserRole] = useState<string | null>(null);
-  
-  // State untuk mengontrol kemunculan Splash Screen
   const [isAppLoading, setIsAppLoading] = useState(true); 
-  
   const supabase = createClient();
 
-  // Menarik role user saat layout dimuat
   useEffect(() => {
     const fetchUserRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
+      
       if (user) {
+        const serverPwdVersion = user.user_metadata?.pwd_version?.toString() || '0';
+        const localPwdVersion = localStorage.getItem('local_pwd_version') || '0';
+
+        if (serverPwdVersion !== localPwdVersion) {
+           sessionStorage.removeItem("staff_verified");
+           localStorage.removeItem("local_pwd_version");
+           await supabase.auth.signOut();
+           window.location.href = "/login";
+           return;
+        }
+
         const { data, error } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-        
-      if (data && !error) {
-        setUserRole(data.role);
-        
-        if (data.role === "staff") {
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+
+        if (data && !error) {
+          setUserRole(data.role);
+
+          if (data.role === "staff") {
             const isVerified = sessionStorage.getItem("staff_verified");
             if (!isVerified) {
               await supabase.auth.signOut(); 
               window.location.href = "/login";
+              return; 
             }
           }
         }
@@ -61,7 +68,6 @@ export default function DashboardLayout({
     fetchUserRole();
   }, [supabase]);
 
-  // Variabel Dinamis berdasarkan Role
   const isOwner = userRole === "owner";
   const greetingName = isOwner ? "Bidan Nina" : "Staff TPMB";
   const profileName = isOwner ? "Bidan Nina" : "Staff TPMB Nina";
@@ -70,18 +76,13 @@ export default function DashboardLayout({
   return (
     <div className={`flex min-h-screen bg-gray-100 ${poppins.className}`}>
       
-      {/* 🔥 ANIMASI SPLASH SCREEN (Keluar perlahan saat isAppLoading false) */}
       <AnimatePresence>
         {isAppLoading && <SplashScreen key="splash" />}
       </AnimatePresence>
 
-      {/* PANGGIL KOMPONEN SIDEBAR DI SINI */}
       <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
 
-      {/* --- CONTENT UTAMA --- */}
       <div className={`flex-1 transition-all duration-300 ${isSidebarOpen ? "lg:ml-64" : "lg:ml-20"}`}>
-        
-        {/* Header Dashboard */}
         <header className="bg-white/80 backdrop-blur-md sticky top-0 z-30 px-6 py-4 flex justify-between items-center border-b border-gray-200">
           <div className="flex items-center gap-4">
             <button 
@@ -91,7 +92,6 @@ export default function DashboardLayout({
               <Menu size={24} />
             </button>
             <div className="hidden md:block">
-              {/* GREETING DINAMIS */}
               <h2 className="text-lg font-bold text-gray-800">Hi, {greetingName} 👋</h2>
               <p className="text-xs text-gray-500">Selamat beraktivitas kembali!</p>
             </div>
@@ -104,7 +104,6 @@ export default function DashboardLayout({
             </button>
             <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
                 <div className="text-right hidden md:block">
-                    {/* NAMA PROFIL & ROLE DINAMIS */}
                     <p className="text-sm font-bold text-gray-700">{profileName}</p>
                     <p className="text-[10px] text-pink-500 font-bold uppercase">{roleLabel}</p>
                 </div>
@@ -118,11 +117,9 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        {/* Child Pages */}
         <main className="p-6">
           {children}
         </main>
-
       </div>
     </div>
   );

@@ -14,10 +14,12 @@ export async function POST(request: Request) {
       process.env.SERVICE_ROLE_KEY
     );
 
-    // Paksa update password
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       uid,
-      { password: newPassword }
+      { 
+        password: newPassword,
+        user_metadata: { pwd_version: Date.now() } 
+      }
     );
     
     if (updateError) throw updateError;
