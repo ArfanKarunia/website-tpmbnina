@@ -98,6 +98,7 @@ const calculatePregnancy = (hphtDate: string, visitDateString: string) => {
 
   return { uk: ukString, hpl: hplString };
 };
+
 const RISK_LEVELS = [
   { value: 'RR', label: 'RR', desc: 'Resiko Rendah', color: 'green' },
   { value: 'RT', label: 'RT', desc: 'Resiko Tinggi', color: 'yellow' },
@@ -130,17 +131,21 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
   const [oldMedicineTrack, setOldMedicineTrack] = useState<{name: string, qty: number}[]>([]);
   const [medicineLoadError, setMedicineLoadError] = useState(false);
 
+  // 🔥 STATE BARU UNTUK KEUANGAN (Metode & Keterangan)
+  const [paymentMethod, setPaymentMethod] = useState("CASH");
+  const [paymentNote, setPaymentNote] = useState("");
+
   const [formData, setFormData] = useState({
     patient_id: "", visit_date: new Date().toISOString().split('T')[0], diagnosis: "", action: "",
-    staff_name: "Bidan Nina", weight: "", blood_pressure: "", heart_rate: "", temperature: "", spo: "", service_fee: 0, risk_level: "",
+    staff_name: "Bidan ", weight: "", blood_pressure: "", heart_rate: "", temperature: "", spo: "", service_fee: 0, risk_level: "",
   });
 
   // --- EFFECTS ---
-useEffect(() => { 
-  if(ancData.hpht) {
-    setCalcResult(calculatePregnancy(ancData.hpht, formData.visit_date)); 
-  }
-}, [ancData.hpht, formData.visit_date]);
+  useEffect(() => { 
+    if(ancData.hpht) {
+      setCalcResult(calculatePregnancy(ancData.hpht, formData.visit_date)); 
+    }
+  }, [ancData.hpht, formData.visit_date]);
 
   useEffect(() => {
     if (isOpen) {
@@ -154,7 +159,7 @@ useEffect(() => {
               patient_id: recordToEdit.patient_id, visit_date: recordToEdit.visit_date,
               diagnosis: recordToEdit.diagnosis.replace(/G\d+\s-\s/, ''), 
               action: recordToEdit.action?.split('\n\n[ANC Data]')[0] || "",
-              staff_name: recordToEdit.staff_name || "Bidan Nina",
+              staff_name: recordToEdit.staff_name || "Bidan ",
               weight: recordToEdit.weight?.toString() || "", blood_pressure: recordToEdit.blood_pressure || "",
               heart_rate: recordToEdit.heart_rate?.toString() || "", temperature: recordToEdit.temperature?.toString() || "",
               spo: recordToEdit.oxygen_saturation?.toString() || "", service_fee: recordToEdit.service_fee,
@@ -162,7 +167,10 @@ useEffect(() => {
           });
           setPatientQuery(recordToEdit.patient_name || ""); 
           checkPatientHistory(recordToEdit.patient_id); 
-          setVisitCategory("Umum (BP)"); // Reset ke default untuk edit jika tidak disimpan di medical_records
+          setVisitCategory("Umum (BP)"); 
+          
+          setPaymentMethod("CASH"); 
+          setPaymentNote("");
 
           if(recordToEdit.diagnosis.toLowerCase().includes('hamil') || recordToEdit.diagnosis.toLowerCase().includes('anc') || recordToEdit.action.includes('[ANC Data]')) {
                setIsAncMode(true);
@@ -190,12 +198,14 @@ useEffect(() => {
           // --- NEW MODE ---
           setFormData({
              patient_id: "", visit_date: new Date().toISOString().split('T')[0], diagnosis: "", action: "",
-             staff_name: "Bidan Nina", weight: "", blood_pressure: "", heart_rate: "", temperature: "", spo: "", service_fee: 0, risk_level: ""
+             staff_name: "Bidan ", weight: "", blood_pressure: "", heart_rate: "", temperature: "", spo: "", service_fee: 0, risk_level: ""
           });
           setAncData({ husband_name: "", hpht: "", gravida: "", usg_type: "2D", leopold1: "", leopold2: "", leopold3: "", leopold4: "", djj: "" });
           setCalcResult({ uk: "", hpl: "" });
           setIsAncMode(false); setPatientQuery(""); setSelectedMedicines([]); setOldMedicineTrack([]); setVisitCount(0); setIsOldPatient(false); setMedicineLoadError(false);
           setVisitCategory("Umum (BP)");
+          setPaymentMethod("CASH");
+          setPaymentNote("");
         }
       };
       initData();
@@ -306,24 +316,34 @@ useEffect(() => {
          recordId = newRec.id;
       }
 
-      // --- 4. INSERT TRANSAKSI DENGAN LABEL KATEGORI BARU ---
+      // --- 4. INSERT TRANSAKSI DENGAN LABEL KATEGORI BARU & METODE PEMBAYARAN ---
       const transactionsPayload = [];
-      if (formData.service_fee > 0) {
-          transactionsPayload.push({ 
-            date: formData.visit_date, 
-            description: `Jasa: ${selectedPatient?.name} (${visitCategory})`, // 🔥 Label Kategori Tersambung
-            category: "Layanan Medis", type: "in", amount: formData.service_fee, quantity: 1,
-            visit_id: recordId 
-          });
-      }
+      const txType = (paymentMethod === "QRIS" || paymentMethod === "BPJS") ? "out" : "in"; // 🔥 Logika Pengeluaran
+      const noteSuffix = paymentNote ? ` - ${paymentNote}` : "";
+
+      // 🔥 WAJIB INSERT WALAU JASA 0 RUPIAH AGAR REKAP PASIEN MATCH!
+      transactionsPayload.push({ 
+        date: formData.visit_date, 
+        description: `Jasa: ${selectedPatient?.name} (${visitCategory}) [${paymentMethod}]${noteSuffix}`,
+        category: "Layanan Medis", 
+        type: txType, 
+        amount: formData.service_fee || 0, 
+        quantity: 1,
+        visit_id: recordId 
+      });
+      
       if (medicineTotal > 0) {
           transactionsPayload.push({ 
             date: formData.visit_date, 
-            description: `Obat: ${selectedPatient?.name} (${visitCategory})`, // 🔥 Label Kategori Tersambung
-            category: "Obat & Vitamin", type: "in", amount: medicineTotal, quantity: 1,
+            description: `Obat: ${selectedPatient?.name} (${visitCategory}) [${paymentMethod}]${noteSuffix}`,
+            category: "Obat & Vitamin", 
+            type: txType, 
+            amount: medicineTotal, 
+            quantity: 1,
             visit_id: recordId 
           });
       }
+
       if (transactionsPayload.length > 0) {
           await supabase.from("transactions").insert(transactionsPayload);
       }
@@ -435,7 +455,7 @@ useEffect(() => {
                                   <p className={`text-xs font-bold ${parseInt(calcResult.uk) > 42 ? 'text-red-600' : 'text-pink-600'}`}>
                                     UK: {calcResult.uk} • HPL: {calcResult.hpl}
                                   </p>
-                                                                                        
+                                                                                                    
                                   {/* TOMBOL RESET JIKA DATA SUDAH LAMA / LEBIH DARI 42 MINGGU */}
                                   {parseInt(calcResult.uk) > 42 && (
                                     <button
@@ -524,17 +544,43 @@ useEffect(() => {
                     </div>
                   </div>
 
-                  {/* KEUANGAN */}
-                  <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                  {/* KEUANGAN & PEMBAYARAN */}
+                  <div className="bg-green-50 p-4 rounded-xl border border-green-200 shadow-sm">
                     <div className="flex justify-between items-center mb-2"><label className="text-sm font-bold text-green-800">Biaya Obat (Otomatis)</label><span className="font-mono font-bold text-gray-700">Rp {medicineTotal.toLocaleString("id-ID")}</span></div>
                     <div className="flex justify-between items-center mb-2"><label className="text-sm font-bold text-green-800">Biaya Jasa</label><input type="number" className="w-32 p-1 border rounded text-right font-mono text-sm" value={formData.service_fee} onChange={(e) => setFormData({...formData, service_fee: parseInt(e.target.value) || 0})} /></div>
-                    <div className="border-t border-green-200 pt-2 flex justify-between items-center mt-2"><label className="text-lg font-bold text-green-900">TOTAL</label><span className="text-xl font-bold text-green-700">Rp {grandTotal.toLocaleString("id-ID")}</span></div>
+                    <div className="border-t border-green-300 pt-2 flex justify-between items-center mt-2 mb-4"><label className="text-lg font-bold text-green-900">TOTAL</label><span className="text-xl font-bold text-green-700">Rp {grandTotal.toLocaleString("id-ID")}</span></div>
+                    
+                    {/* 🔥 FORM METODE PEMBAYARAN BARU */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-green-300 border-dashed">
+                      <div>
+                        <label className="text-xs font-bold text-green-900 mb-1 block uppercase">Metode Pembayaran</label>
+                        <select 
+                          className="w-full p-2 border border-green-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none font-bold text-gray-700" 
+                          value={paymentMethod} 
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                        >
+                          <option value="CASH">💵 CASH </option>
+                          <option value="QRIS">📱 QRIS </option>
+                          <option value="BPJS">🏥 BPJS </option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-green-900 mb-1 block uppercase">Keterangan (Opsional)</label>
+                        <input 
+                          type="text" 
+                          placeholder="Contoh: QRIS a.n Suami / Klaim Bulan Ini" 
+                          className="w-full p-2 border border-green-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none" 
+                          value={paymentNote} 
+                          onChange={(e) => setPaymentNote(e.target.value)} 
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* INPUT PETUGAS & TOMBOL */}
                   <div className="flex items-center gap-4 mt-4">
                     <div className="w-1/3"><label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Petugas</label><div className="relative"><User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/><input type="text" required className="w-full pl-9 p-2 border rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.staff_name} onChange={(e) => setFormData({...formData, staff_name: e.target.value})} /></div></div>
-                    <button type="submit" disabled={loading} className="flex-1 bg-blue-600 text-white font-bold py-2.5 rounded-xl hover:bg-blue-700 flex justify-center items-center gap-2 mt-5">{loading ? "Menyimpan..." : <><Save size={18} /> {recordToEdit ? "Simpan Perubahan" : "Simpan Data"}</>}</button>
+                    <button type="submit" disabled={loading} className="flex-1 bg-blue-600 text-white font-bold py-2.5 rounded-xl hover:bg-blue-700 flex justify-center items-center gap-2 mt-5 shadow-lg shadow-blue-200 transition-all">{loading ? "Menyimpan..." : <><Save size={18} /> {recordToEdit ? "Simpan Perubahan" : "Simpan Data"}</>}</button>
                   </div>
                 </form>
             </div>

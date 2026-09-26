@@ -35,7 +35,6 @@ export default function Hero({dict}: HeroProps) {
   return (
     <section id="home" className="relative w-full h-screen min-h-[600px] overflow-hidden">
       
-      {/* 1. BACKGROUND SLIDESHOW (TETAP SAMA) */}
       <div className="absolute inset-0 w-full h-full">
         <AnimatePresence initial={false}>
           <motion.div
