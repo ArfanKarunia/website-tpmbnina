@@ -4,24 +4,15 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/app/utils/supabase/client";
 import { User, Phone, Calendar, CheckCircle2, AlertCircle, Activity, MapPin, Heart, Baby, Clock } from "lucide-react";
 
-const TARIF_USG = [
-  { nama: "2D (Hitam Putih)", harga: 100000 },
-  { nama: "2D (Berwarna)", harga: 130000 },
-  { nama: "Cek IUD", harga: 120000 },
-  { nama: "Kesehatan Produksi", harga: 120000 },
-  { nama: "Program Kehamilan", harga: 120000 },
-  { nama: "3D (Hitam Putih)", harga: 150000 },
-  { nama: "3D (Berwarna)", harga: 200000 },
-  { nama: "4D (Hitam Putih)", harga: 220000 },
-  { nama: "4D (Berwarna)", harga: 280000 },
-];
-
 export default function ReservasiUSGPublic() {
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [noAntrianFix, setNoAntrianFix] = useState(0); 
+
+  const [tarifUsg, setTarifUsg] = useState<{nama: string, harga: number}[]>([]);
+  const [isTarifLoading, setIsTarifLoading] = useState(true);
 
   const [closedDays, setClosedDays] = useState<{date: string, reason: string}[]>([]);
   
@@ -31,13 +22,25 @@ export default function ReservasiUSGPublic() {
     tanggal_reservasi: "", jam_reservasi: "", kehamilan_ke: "", hpht: "", jenis_usg: "", harga: 0,
   });
 
-  
   useEffect(() => {
-    const fetchClosedDays = async () => {
-      const { data } = await supabase.from("usg_closed_days").select("date, reason");
-      if (data) setClosedDays(data);
+    const fetchData = async () => {
+      // Ambil hari libur
+      const { data: closedData } = await supabase.from("usg_closed_days").select("date, reason");
+      if (closedData) setClosedDays(closedData);
+
+      // Ambil harga dinamis dari CMS
+      setIsTarifLoading(true);
+      const { data: priceData } = await supabase
+        .from("usg_prices")
+        .select("*")
+        .eq("is_active", true)
+        .order("price", { ascending: true });
+      if (priceData) {
+        setTarifUsg(priceData.map(p => ({ nama: p.package_name, harga: p.price })));
+      }
+      setIsTarifLoading(false);
     };
-    fetchClosedDays();
+    fetchData();
   }, [supabase]);
 
   useEffect(() => {
@@ -327,9 +330,9 @@ export default function ReservasiUSGPublic() {
 
           <div>
             <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1">Pilih Paket Layanan USG</label>
-            <select required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-gray-700 text-sm md:text-base appearance-none" value={newPatient.jenis_usg} onChange={(e) => { const selected = TARIF_USG.find(t => t.nama === e.target.value); setNewPatient({...newPatient, jenis_usg: e.target.value, harga: selected ? selected.harga : 0}); }}>
-              <option value="" disabled>-- Sentuh untuk memilih --</option>
-              {TARIF_USG.map(tarif => <option key={tarif.nama} value={tarif.nama}>{tarif.nama} - {formatRupiah(tarif.harga)}</option>)}
+            <select disabled={isTarifLoading} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none font-medium text-gray-700 text-sm md:text-base appearance-none" value={newPatient.jenis_usg} onChange={(e) => { const selected = tarifUsg.find(t => t.nama === e.target.value); setNewPatient({...newPatient, jenis_usg: e.target.value, harga: selected ? selected.harga : 0}); }}>
+              <option value="" disabled>{isTarifLoading ? "Memuat Harga..." : "-- Sentuh untuk memilih --"}</option>
+              {tarifUsg.map(tarif => <option key={tarif.nama} value={tarif.nama}>{tarif.nama} - {formatRupiah(tarif.harga)}</option>)}
             </select>
           </div>
 

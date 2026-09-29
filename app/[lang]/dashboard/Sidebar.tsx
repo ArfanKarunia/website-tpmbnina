@@ -15,6 +15,7 @@ import {
   ClipboardList,
   LogOut, 
   X,
+  Settings2,
   ShieldCheck 
 } from "lucide-react";
 
@@ -153,6 +154,20 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
                   <Wallet size={22} className={`shrink-0 ${pathname.includes("/dashboard/keuangan-usg") ? "text-pink-600" : "text-gray-400"}`} />
                   <span className={`ml-3 whitespace-nowrap transition-all duration-300 overflow-hidden ${isSidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0 hidden"}`}>
                       Keuangan USG
+                  </span>
+                </Link>
+              </li>
+
+              <li className="relative group">
+                <Link
+                  href="/dashboard/cms/harga-usg"
+                  className={`flex items-center p-3 rounded-xl transition-all duration-200
+                    ${pathname.includes("/dashboard/cms/harga-usg") ? "bg-pink-50 text-pink-600 shadow-sm font-semibold" : "text-gray-500 hover:bg-pink-50 hover:text-pink-600"}
+                  `}
+                >
+                  <Settings2 size={22} className={`shrink-0 ${pathname.includes("/dashboard/cms/harga-usg") ? "text-pink-600" : "text-gray-400"}`} />
+                  <span className={`ml-3 whitespace-nowrap transition-all duration-300 overflow-hidden ${isSidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0 hidden"}`}>
+                      Harga USG
                   </span>
                 </Link>
               </li>

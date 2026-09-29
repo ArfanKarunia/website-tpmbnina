@@ -25,18 +25,6 @@ interface USGPasien {
   created_at: string;
 }
 
-const TARIF_USG = [
-  { nama: "2D (Hitam Putih)", harga: 100000 },
-  { nama: "2D (Berwarna)", harga: 130000 },
-  { nama: "Cek IUD", harga: 120000 },
-  { nama: "Kesehatan Produksi", harga: 120000 },
-  { nama: "Program Kehamilan", harga: 120000 },
-  { nama: "3D (Hitam Putih)", harga: 150000 },
-  { nama: "3D (Berwarna)", harga: 200000 },
-  { nama: "4D (Hitam Putih)", harga: 220000 },
-  { nama: "4D (Berwarna)", harga: 280000 },
-];
-
 export default function DataUSGPage() {
   const supabase = createClient();
   const [patients, setPatients] = useState<USGPasien[]>([]);
@@ -58,6 +46,9 @@ export default function DataUSGPage() {
     patient_name: "", umur: "", nama_suami: "", alamat: "", phone: "",
     tanggal_reservasi: selectedDate, jam_reservasi: "", kehamilan_ke: "", hpht: "", jenis_usg: "", harga: 0
   });
+
+  const [tarifUsg, setTarifUsg] = useState<{nama: string, harga: number}[]>([]);
+  const [isTarifLoading, setIsTarifLoading] = useState(true);
 
   const getJamOperasional = (dateString: string) => {
     if (!dateString) return "";
@@ -105,6 +96,19 @@ export default function DataUSGPage() {
     if (data) setClosedDays(data.map(d => d.date));
   };
 
+  const fetchTarif = async () => {
+    setIsTarifLoading(true);
+    const { data } = await supabase
+      .from("usg_prices")
+      .select("*")
+      .eq("is_active", true)
+      .order("price", { ascending: true });
+    if (data) {
+      setTarifUsg(data.map(p => ({ nama: p.package_name, harga: p.price })));
+    }
+    setIsTarifLoading(false);
+  };
+
   const fetchPatients = async () => {
     setLoading(true);
     let query = supabase.from("usg_reservations").select("*");
@@ -128,6 +132,7 @@ export default function DataUSGPage() {
   useEffect(() => {
     fetchClosedDays();
     fetchPatients();
+    fetchTarif();
     setNewPatient(prev => ({ ...prev, tanggal_reservasi: selectedDate, jam_reservasi: getJamOperasional(selectedDate) }));
   }, [selectedDate, activeTab]);
 
@@ -627,12 +632,12 @@ export default function DataUSGPage() {
 
               <div>
                 <label className="block text-xs md:text-sm font-bold text-gray-700 mb-1">Pilih Paket USG</label>
-                <select required className="w-full px-3 py-2.5 md:px-4 md:py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 text-sm" value={newPatient.jenis_usg} onChange={(e) => {
-                    const sel = TARIF_USG.find(t => t.nama === e.target.value);
+                <select disabled={isTarifLoading} required className="w-full px-3 py-2.5 md:px-4 md:py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 text-sm" value={newPatient.jenis_usg} onChange={(e) => {
+                    const sel = tarifUsg.find(t => t.nama === e.target.value);
                     setNewPatient({...newPatient, jenis_usg: e.target.value, harga: sel ? sel.harga : 0});
                   }}>
-                  <option value="" disabled>-- Pilih Jenis USG --</option>
-                  {TARIF_USG.map(tarif => <option key={tarif.nama} value={tarif.nama}>{tarif.nama} - {formatRupiah(tarif.harga)}</option>)}
+                  <option value="" disabled>{isTarifLoading ? "Memuat Harga..." : "-- Pilih Jenis USG --"}</option>
+                  {tarifUsg.map(tarif => <option key={tarif.nama} value={tarif.nama}>{tarif.nama} - {formatRupiah(tarif.harga)}</option>)}
                 </select>
               </div>
 
