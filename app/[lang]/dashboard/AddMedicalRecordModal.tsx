@@ -419,6 +419,7 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
                             <option value="Umum (BP)">Umum (BP)</option>
                             <option value="KIA - BPJS">KIA - BPJS</option>
                             <option value="KIA - Non BPJS">KIA - Non BPJS</option>
+                            <option value="KB">KB</option>
                         </select>
                     </div>
                     <div>

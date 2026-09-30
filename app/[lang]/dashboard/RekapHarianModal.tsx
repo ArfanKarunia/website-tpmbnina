@@ -41,12 +41,18 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
     const expCategories: Record<string, number> = {};
 
     dailyData.forEach(t => {
+      // 1. LOGIKA HITUNG PASIEN (Jalan untuk in & out)
+      let nameMatch = t.description.match(/(?:Jasa|Obat):\s*(.*?)\s*\(/);
+      if (nameMatch) {
+        let patientName = nameMatch[1].trim();
+        if (t.description.includes('(Umum (BP))')) uniqueUmum.add(patientName);
+        else if (t.description.includes('(KIA - BPJS)')) uniqueKiaBpjs.add(patientName);
+        else if (t.description.includes('(KIA - Non BPJS)')) uniqueKiaNonBpjs.add(patientName);
+      }
+
+      // 2. LOGIKA HITUNG UANG (Pisahkan in dan out seperti sebelumnya)
       if (t.type === 'in') {
         income += Number(t.amount);
-        const patientNameStr = t.description.replace("Jasa: ", "").replace("Obat: ", "").trim();
-        if (t.description.includes('(Umum (BP))')) uniqueUmum.add(patientNameStr);
-        else if (t.description.includes('(KIA - BPJS)')) uniqueKiaBpjs.add(patientNameStr);
-        else if (t.description.includes('(KIA - Non BPJS)')) uniqueKiaNonBpjs.add(patientNameStr);
       } else {
         const amount = Number(t.amount);
         totalExp += amount;
