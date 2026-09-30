@@ -318,7 +318,7 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
 
       // --- 4. INSERT TRANSAKSI DENGAN LABEL KATEGORI BARU & METODE PEMBAYARAN ---
       const transactionsPayload = [];
-      const txType = (paymentMethod === "QRIS" || paymentMethod === "BPJS") ? "out" : "in"; // 🔥 Logika Pengeluaran
+      const txType = (paymentMethod === "QRIS" || paymentMethod === "BPJS" || paymentMethod === "BKKBN") ? "out" : "in"; // 🔥 Logika Pengeluaran
       const noteSuffix = paymentNote ? ` - ${paymentNote}` : "";
 
       // 🔥 WAJIB INSERT WALAU JASA 0 RUPIAH AGAR REKAP PASIEN MATCH!
@@ -563,6 +563,7 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
                           <option value="CASH">💵 CASH </option>
                           <option value="QRIS">📱 QRIS </option>
                           <option value="BPJS">🏥 BPJS </option>
+                          <option value="BKKBN">🏥 BKKBN </option>
                         </select>
                       </div>
                       <div>
