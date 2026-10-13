@@ -16,7 +16,8 @@ import {
   LogOut, 
   X,
   Settings2,
-  ShieldCheck 
+  ShieldCheck,
+  PieChart 
 } from "lucide-react";
 
 interface SidebarProps {
@@ -168,6 +169,20 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
                   <Settings2 size={22} className={`shrink-0 ${pathname.includes("/dashboard/cms/harga-usg") ? "text-pink-600" : "text-gray-400"}`} />
                   <span className={`ml-3 whitespace-nowrap transition-all duration-300 overflow-hidden ${isSidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0 hidden"}`}>
                       Harga USG
+                  </span>
+                </Link>
+              </li>
+
+              <li className="relative group">
+                <Link
+                  href="/dashboard/cms/pengaturan-keuangan"
+                  className={`flex items-center p-3 rounded-xl transition-all duration-200
+                    ${pathname.includes("/dashboard/cms/pengaturan-keuangan") ? "bg-pink-50 text-pink-600 shadow-sm font-semibold" : "text-gray-500 hover:bg-pink-50 hover:text-pink-600"}
+                  `}
+                >
+                  <PieChart size={22} className={`shrink-0 ${pathname.includes("/dashboard/cms/pengaturan-keuangan") ? "text-pink-600" : "text-gray-400"}`} />
+                  <span className={`ml-3 whitespace-nowrap transition-all duration-300 overflow-hidden ${isSidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0 hidden"}`}>
+                      Pengaturan Keuangan
                   </span>
                 </Link>
               </li>

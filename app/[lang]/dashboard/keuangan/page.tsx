@@ -1,14 +1,21 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { createClient } from "@/app/utils/supabase/client";
 import { 
   Wallet, TrendingUp, TrendingDown, FileText, Download, Plus, RefreshCcw, 
-  Filter, Box, Pencil, Trash2, Search, X, Calendar, Activity, Receipt
+  Filter, Box, Pencil, Trash2, Search, X, Calendar, Activity, Receipt, PieChart
 } from "lucide-react";
 import AddTransactionModal from "../AddTransactionModal";
 import ActionModal from "../ActionModal";
 import RekapHarianModal from "../RekapHarianModal";
+
+interface FinancialSplit {
+  id: string;
+  category_name: string;
+  percentage: number;
+}
 
 interface Transaction {
   id: string;
@@ -49,6 +56,19 @@ export default function KeuanganPage() {
 
   // STATS STATE
   const [stats, setStats] = useState({ income: 0, expense: 0, net: 0 });
+
+  // FINANCIAL SPLITS STATE
+  const [splits, setSplits] = useState<FinancialSplit[]>([]);
+
+  const fetchSplits = async () => {
+    const { data, error } = await supabase
+      .from("financial_splits")
+      .select("id, category_name, percentage")
+      .order("created_at", { ascending: true });
+    if (!error && data) {
+      setSplits(data);
+    }
+  };
 
   // REKAP HARIAN STATES
   const [isRekapModalOpen, setIsRekapModalOpen] = useState(false);
@@ -113,10 +133,12 @@ export default function KeuanganPage() {
 
     setTransactions(uniqueData);
     setIsLoading(false);
+    fetchSplits();
   };
 
   useEffect(() => { 
     fetchTransactions(); 
+    fetchSplits();
   }, [startDate, endDate]);
 
   const filteredTransactions = useMemo(() => {
@@ -279,27 +301,80 @@ export default function KeuanganPage() {
 
       {/* 🔥 STATS DENGAN ROLE-BASED ACCESS (HANYA MUNCUL JIKA OWNER) */}
       {userRole === "owner" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-          <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden group">
-            <div className="relative z-10">
-              <p className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Pemasukan (Terfilter)</p>
-              <h3 className="text-xl md:text-2xl font-bold text-green-600">{isLoading ? "..." : formatRupiah(stats.income)}</h3>
+        <div className="space-y-4 md:space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden group">
+              <div className="relative z-10">
+                <p className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Pemasukan (Terfilter)</p>
+                <h3 className="text-xl md:text-2xl font-bold text-green-600">{isLoading ? "..." : formatRupiah(stats.income)}</h3>
+              </div>
+              <div className="absolute right-4 top-4 text-green-50 opacity-50 group-hover:scale-110 transition-transform"><Wallet size={60} className="md:w-20 md:h-20" /></div>
             </div>
-            <div className="absolute right-4 top-4 text-green-50 opacity-50 group-hover:scale-110 transition-transform"><Wallet size={60} className="md:w-20 md:h-20" /></div>
+            <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden group">
+              <div className="relative z-10">
+                <p className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Pengeluaran (Terfilter)</p>
+                <h3 className="text-xl md:text-2xl font-bold text-red-500">{isLoading ? "..." : formatRupiah(stats.expense)}</h3>
+              </div>
+              <div className="absolute right-4 top-4 text-red-50 opacity-50 group-hover:scale-110 transition-transform"><FileText size={60} className="md:w-20 md:h-20" /></div>
+            </div>
+            <div className="bg-blue-600 p-5 md:p-6 rounded-2xl shadow-lg shadow-blue-200 relative overflow-hidden text-white group">
+              <div className="relative z-10">
+                <p className="text-[10px] md:text-xs font-bold text-blue-200 uppercase tracking-wider mb-1">Saldo Bersih</p>
+                <h3 className="text-2xl md:text-3xl font-bold">{isLoading ? "..." : formatRupiah(stats.net)}</h3>
+              </div>
+              <div className="absolute -right-4 -bottom-4 text-blue-500 opacity-40 group-hover:scale-110 transition-transform"><Wallet size={100} className="md:w-[120px] md:h-[120px]" /></div>
+            </div>
           </div>
-          <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden group">
-            <div className="relative z-10">
-              <p className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Pengeluaran (Terfilter)</p>
-              <h3 className="text-xl md:text-2xl font-bold text-red-500">{isLoading ? "..." : formatRupiah(stats.expense)}</h3>
+
+          {/* SIMULASI ALOKASI DANA (FINANCIAL SPLITTER) */}
+          <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+              <div>
+                <h2 className="text-base md:text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <PieChart className="text-pink-500" size={20} />
+                  Simulasi Alokasi Dana (Berdasarkan Total Pemasukan Terfilter)
+                </h2>
+                <p className="text-gray-400 text-xs mt-0.5">
+                  Dihitung otomatis dari total pemasukan: <span className="font-bold text-green-600">{formatRupiah(stats.income)}</span>
+                </p>
+              </div>
+              <Link 
+                href="/dashboard/cms/pengaturan-keuangan"
+                className="text-xs font-semibold text-pink-600 hover:text-pink-700 hover:underline flex items-center gap-1 w-fit"
+              >
+                Kelola Persentase &rarr;
+              </Link>
             </div>
-            <div className="absolute right-4 top-4 text-red-50 opacity-50 group-hover:scale-110 transition-transform"><FileText size={60} className="md:w-20 md:h-20" /></div>
-          </div>
-          <div className="bg-blue-600 p-5 md:p-6 rounded-2xl shadow-lg shadow-blue-200 relative overflow-hidden text-white group">
-            <div className="relative z-10">
-              <p className="text-[10px] md:text-xs font-bold text-blue-200 uppercase tracking-wider mb-1">Saldo Bersih</p>
-              <h3 className="text-2xl md:text-3xl font-bold">{isLoading ? "..." : formatRupiah(stats.net)}</h3>
-            </div>
-            <div className="absolute -right-4 -bottom-4 text-blue-500 opacity-40 group-hover:scale-110 transition-transform"><Wallet size={100} className="md:w-[120px] md:h-[120px]" /></div>
+
+            {splits.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">Belum ada data pengaturan alokasi persentase.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                {splits.map((item) => {
+                  const nominal = (stats.income * Number(item.percentage)) / 100;
+                  return (
+                    <div 
+                      key={item.id} 
+                      className="p-4 rounded-2xl border border-gray-100 bg-gray-50/60 hover:bg-gray-50 transition-colors flex flex-col justify-between"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <span className="text-xs font-bold text-gray-700 line-clamp-1">
+                          {item.category_name}
+                        </span>
+                        <span className="text-xs font-extrabold text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-100 shrink-0">
+                          {item.percentage}%
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-base md:text-lg font-extrabold text-gray-900">
+                          {formatRupiah(nominal)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
