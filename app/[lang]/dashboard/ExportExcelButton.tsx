@@ -2,10 +2,12 @@
 
 import { Download } from "lucide-react";
 import * as XLSX from "xlsx";
+import { createClient } from "@/app/utils/supabase/client";
 
 // Sesuaikan interface ini dengan yang ada di PelayananPage
 interface MedicalRecord {
   id: string;
+  patient_id?: string;
   visit_date: string;
   patient_name: string;
   patient_address: string;
@@ -23,6 +25,7 @@ interface MedicalRecord {
   medicine_cost: number;
   service_fee: number;
   risk_level?: string;
+  created_at?: string;
 }
 
 interface ExportProps {
@@ -67,10 +70,42 @@ export default function ExportExcelButton({ records }: ExportProps) {
   };
 
   // --- 2. FORMAT DATA UNTUK EXCEL ---
-  const handleExport = () => {
-    // A. Siapkan Wadah Data
-    // Kita pakai struktur Array of Arrays agar bisa bikin Header Bertingkat (Terutama KIA)
+  const handleExport = async () => {
+    const supabase = createClient();
     
+    // Kumpulkan patient_id unik untuk mengambil detail pasien
+    const patientIds = Array.from(
+      new Set(records.map((r) => r.patient_id).filter((id): id is string => Boolean(id)))
+    );
+
+    interface PatientInfo {
+      id: string;
+      nik?: string;
+      husband_name?: string;
+      birth_date?: string;
+      type?: string;
+    }
+
+    const patientMap = new Map<string, PatientInfo>();
+
+    if (patientIds.length > 0) {
+      try {
+        const { data, error } = await supabase
+          .from("patients")
+          .select("id, nik, husband_name, birth_date, type")
+          .in("id", patientIds);
+
+        if (data && !error) {
+          data.forEach((p) => {
+            patientMap.set(p.id, p);
+          });
+        }
+      } catch (err) {
+        console.error("Gagal mengambil data pasien untuk register KB:", err);
+      }
+    }
+
+    // A. Siapkan Wadah Data
     // Header KIA (Baris 1 & 2)
     const kiaHeader1 = [
       "TGL", "NO", "NAMA", "UMUR", "ALAMAT", "RT", "RW", "BB", "S", "DIAGNOSA", "TERAPI", 
@@ -92,30 +127,64 @@ export default function ExportExcelButton({ records }: ExportProps) {
     const kiaData: any[][] = [kiaHeader1, kiaHeader2];
     const bpData: any[][] = [bpHeader];
 
-    // B. Loop Semua Data & Mapping
+    // B. Urutkan Data secara Kronologis (Terlama ke Terbaru) & Mapping
+    const sortedRecords = [...records].sort((a, b) => {
+      const dateDiff = new Date(a.visit_date).getTime() - new Date(b.visit_date).getTime();
+      if (dateDiff !== 0) return dateDiff;
+
+      if (a.created_at && b.created_at) {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      }
+      return 0;
+    });
+
+    // Kop & Header REGISTER KB
+    const earliestDate = sortedRecords.length > 0 ? new Date(sortedRecords[0].visit_date) : new Date();
+    const bulanTahun = !isNaN(earliestDate.getTime())
+      ? earliestDate.toLocaleDateString("id-ID", { month: "long", year: "numeric" }).toUpperCase()
+      : new Date().toLocaleDateString("id-ID", { month: "long", year: "numeric" }).toUpperCase();
+
+    const kbKop1 = ["REGISTER KB"];
+    const kbKop2 = [`BULAN ${bulanTahun}`];
+    const kbKop3 = ["TPMB NINA RAHAYU"];
+    const kbKop4: any[] = [];
+
+    const kbHeader1 = [
+      "TGL", "NO", "NAMA IBU", "NAMA SUAMI", "NIK", "TTL / UMUR", "ALAMAT", 
+      "JENIS KB", "", "", "", "", "", "", 
+      "JUMLAH ANAK", "UMUM", "BPJS", "BKKBN", "KET"
+    ];
+    const kbHeader2 = [
+      "", "", "", "", "", "", "", 
+      "PIL", "3 BLN", "2 BLN", "1 BLN", "IUD", "IMPLANT", "KONDOM", 
+      "", "", "", "", ""
+    ];
+
+    const kbData: any[][] = [kbKop1, kbKop2, kbKop3, kbKop4, kbHeader1, kbHeader2];
+
     let noKia = 1;
     let noBp = 1;
 
-    records.forEach((rec) => {
+    let currentKbDate = "";
+    let noKb = 1;
+
+    sortedRecords.forEach((rec) => {
       const category = getCategory(rec);
       const dateFormatted = new Date(rec.visit_date).toLocaleDateString("id-ID");
       
       // Parse RT/RW sederhana (Cari pola "RT 01" atau "RW 02" di alamat)
-      // Kalau mau simpel, kosongkan saja atau isi manual nanti
       const rt = ""; 
       const rw = ""; 
 
       if (category === "KIA") {
         // --- MAPPING DATA KIA ---
-        
-        // Logika Centang (Isi angka "1" di kolom yang sesuai)
         const ageStr = (rec.patient_age || "").toUpperCase();
         const diag = (rec.diagnosis || "").toUpperCase();
         const act = (rec.action || "").toUpperCase();
         const combined = diag + " " + act;
 
         // Kategori Umur
-        const isBayi = ageStr.includes("BLN") || ageStr.includes("HARI"); // Asumsi kasar
+        const isBayi = ageStr.includes("BLN") || ageStr.includes("HARI");
         const isBalita = !isBayi && ageStr.includes("TH") && parseInt(ageStr) < 7;
 
         // Deteksi ANC/PNC/KB dari teks diagnosa
@@ -125,7 +194,7 @@ export default function ExportExcelButton({ records }: ExportProps) {
         const isK4 = combined.includes("K4");
         
         const isRR = rec.risk_level === "RR";
-        const isRT = rec.risk_level === "RT" || rec.risk_level === "RST"; // RST kita anggap RT+ di laporan
+        const isRT = rec.risk_level === "RT" || rec.risk_level === "RST";
 
         const isKF1 = combined.includes("KF1");
         const isKF2 = combined.includes("KF2");
@@ -179,6 +248,72 @@ export default function ExportExcelButton({ records }: ExportProps) {
         ];
         kiaData.push(row);
 
+        // --- SELEKSI & MAPPING DATA REGISTER KB ---
+        const combinedKb = (
+          (rec.diagnosis || "") + " " +
+          (rec.action || "") + " " +
+          (rec.therapy || "")
+        ).toUpperCase();
+
+        const isPilKb = combinedKb.includes("PIL");
+        const is3BlnKb = combinedKb.includes("3 BLN") || combinedKb.includes("TRICLO") || combinedKb.includes("DEPO");
+        const is2BlnKb = combinedKb.includes("2 BLN") || combinedKb.includes("2BL");
+        const is1BlnKb = combinedKb.includes("1 BLN") || combinedKb.includes("CYCLO");
+        const isIudKb = combinedKb.includes("IUD");
+        const isImplantKb = combinedKb.includes("IMPLANT") || combinedKb.includes("SUSUK");
+        const isKondomKb = combinedKb.includes("KONDOM");
+
+        const hasKb = isPilKb || is3BlnKb || is2BlnKb || is1BlnKb || isIudKb || isImplantKb || isKondomKb;
+
+        if (hasKb) {
+          if (dateFormatted !== currentKbDate) {
+            currentKbDate = dateFormatted;
+            noKb = 1;
+          }
+
+          const patientInfo = rec.patient_id ? patientMap.get(rec.patient_id) : undefined;
+
+          // TTL / UMUR: patient_age; bila kosong, pakai birth_date pasien format id-ID
+          let ttlUmur = rec.patient_age || "";
+          if (!ttlUmur && patientInfo?.birth_date) {
+            const birthDate = new Date(patientInfo.birth_date);
+            ttlUmur = !isNaN(birthDate.getTime()) ? birthDate.toLocaleDateString("id-ID") : "";
+          }
+
+          // UMUM: bila type pasien "Umum", isi total_price; BPJS: bila type "BPJS", isi "1"; BKKBN: kosong
+          let umumVal: any = "";
+          let bpjsVal = "";
+          if (patientInfo?.type === "Umum") {
+            umumVal = rec.total_price;
+          } else if (patientInfo?.type === "BPJS") {
+            bpjsVal = "1";
+          }
+
+          const kbRow = [
+            dateFormatted,
+            noKb++,
+            rec.patient_name,
+            patientInfo?.husband_name || "",
+            patientInfo?.nik || "",
+            ttlUmur,
+            rec.patient_address,
+            isPilKb ? "1" : "",
+            is3BlnKb ? "1" : "",
+            is2BlnKb ? "1" : "",
+            is1BlnKb ? "1" : "",
+            isIudKb ? "1" : "",
+            isImplantKb ? "1" : "",
+            isKondomKb ? "1" : "",
+            "", // JUMLAH ANAK
+            umumVal,
+            bpjsVal,
+            "", // BKKBN
+            rec.therapy || "" // KET
+          ];
+
+          kbData.push(kbRow);
+        }
+
       } else {
         // --- MAPPING DATA BP ---
         const row = [
@@ -210,10 +345,9 @@ export default function ExportExcelButton({ records }: ExportProps) {
     // Sheet 1: KIA
     const wsKia = XLSX.utils.aoa_to_sheet(kiaData);
     
-    // Merge Header KIA (Contoh: ANC K1-K4) - Opsional, bikin cantik
-    // !merges mengharapkan object {s: {r, c}, e: {r, c}} -> Start/End Row/Col
+    // Merge Header KIA (Contoh: ANC K1-K4)
     wsKia['!merges'] = [
-      { s: { r: 0, c: 11 }, e: { r: 0, c: 12 } }, // Merge Header BAYI-BALITA (diatasnya kosong sebenernya di CSV mu)
+      { s: { r: 0, c: 11 }, e: { r: 0, c: 12 } }, // Merge Header BAYI-BALITA
       { s: { r: 0, c: 13 }, e: { r: 0, c: 16 } }, // Merge ANC (K1-K4)
       { s: { r: 0, c: 17 }, e: { r: 0, c: 18 } }, // Merge KET (RR-RT)
       { s: { r: 0, c: 20 }, e: { r: 0, c: 23 } }, // Merge PNC (KF1-KF4)
@@ -224,6 +358,13 @@ export default function ExportExcelButton({ records }: ExportProps) {
     // Sheet 2: PASIEN BP
     const wsBp = XLSX.utils.aoa_to_sheet(bpData);
     XLSX.utils.book_append_sheet(wb, wsBp, "PASIEN BP");
+
+    // Sheet 3: REGISTER KB
+    const wsKb = XLSX.utils.aoa_to_sheet(kbData);
+    wsKb['!merges'] = [
+      { s: { r: 4, c: 7 }, e: { r: 4, c: 13 } }, // Merge Header JENIS KB (PIL hingga KONDOM)
+    ];
+    XLSX.utils.book_append_sheet(wb, wsKb, "REGISTER KB");
 
     // D. Download
     XLSX.writeFile(wb, `Laporan_Pelayanan_${new Date().toISOString().split('T')[0]}.xlsx`);
