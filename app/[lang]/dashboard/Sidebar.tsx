@@ -30,23 +30,40 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
   const router = useRouter();
   const supabase = createClient();
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [pendingConsultsCount, setPendingConsultsCount] = useState<number>(0);
 
   useEffect(() => {
-    const fetchUserRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
+    const fetchSidebarData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", user.id)
+            .single();
 
-        if (data && !error) {
-          setUserRole(data.role);
+          if (data && !error) {
+            setUserRole(data.role);
+
+            // Bila role owner, ambil jumlah antrean konsul berstatus MENUNGGU untuk badge Protokol Obat
+            if (data.role === "owner") {
+              const { count, error: countError } = await supabase
+                .from("protocol_consultations")
+                .select("*", { count: "exact", head: true })
+                .eq("status", "MENUNGGU");
+
+              if (!countError && count !== null) {
+                setPendingConsultsCount(count);
+              }
+            }
+          }
         }
+      } catch (err) {
+        console.error("Gagal memuat data sidebar:", err);
       }
     };
-    fetchUserRole();
+    fetchSidebarData();
   }, [supabase]);
 
   const handleLogout = async () => {
@@ -59,6 +76,7 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
   const mainMenus = [
     { name: "Beranda", href: "/dashboard", icon: LayoutDashboard },
     { name: "Pelayanan", href: "/dashboard/pelayanan", icon: Stethoscope },
+    { name: "Protokol Obat", href: "/dashboard/protokol-obat", icon: Pill, showOwnerBadge: true },
     { name: "Data Pasien", href: "/dashboard/pasien", icon: Users },
     { name: "Keuangan", href: "/dashboard/keuangan", icon: Wallet },
     { name: "Stok Obat",  href: "/dashboard/obat", icon: Pill },
@@ -111,19 +129,28 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
               <li key={menu.name} className="relative group">
                 <Link
                   href={menu.href}
-                  className={`flex items-center p-3 rounded-xl transition-all duration-200
+                  className={`flex items-center justify-between p-3 rounded-xl transition-all duration-200
                     ${isActive 
                       ? "bg-blue-50 text-blue-600 shadow-sm font-semibold" 
                       : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
                     }
                   `}
                 >
-                  <menu.icon size={22} className={`shrink-0 ${isActive ? "text-blue-600" : "text-gray-400"}`} />
-                  <span className={`ml-3 whitespace-nowrap transition-all duration-300 overflow-hidden
-                    ${isSidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0 hidden"}
-                  `}>
-                      {menu.name}
-                  </span>
+                  <div className="flex items-center min-w-0">
+                    <menu.icon size={22} className={`shrink-0 ${isActive ? "text-blue-600" : "text-gray-400"}`} />
+                    <span className={`ml-3 whitespace-nowrap transition-all duration-300 overflow-hidden
+                      ${isSidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0 hidden"}
+                    `}>
+                        {menu.name}
+                    </span>
+                  </div>
+
+                  {/* Badge Notifikasi Khusus Owner pada Menu Tertentu */}
+                  {menu.showOwnerBadge && userRole === "owner" && isSidebarOpen && (
+                    <span className="ml-2 px-2 py-0.5 text-xs font-bold bg-amber-100 text-amber-700 rounded-full border border-amber-200 shrink-0">
+                      {pendingConsultsCount}
+                    </span>
+                  )}
                 </Link>
               </li>
             );
