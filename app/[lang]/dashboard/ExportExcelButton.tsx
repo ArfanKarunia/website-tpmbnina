@@ -69,13 +69,36 @@ export default function ExportExcelButton({ records }: ExportProps) {
     return "BP";
   };
 
+  // --- HELPER PREDIKAT KB BERSAMA ---
+  const isKbRecord = (rec: MedicalRecord) => {
+    const combinedKb = (
+      (rec.diagnosis || "") + " " +
+      (rec.action || "") + " " +
+      (rec.therapy || "")
+    ).toUpperCase();
+
+    const isPilKb = combinedKb.includes("PIL");
+    const is3BlnKb = combinedKb.includes("3 BLN") || combinedKb.includes("TRICLO") || combinedKb.includes("DEPO");
+    const is2BlnKb = combinedKb.includes("2 BLN") || combinedKb.includes("2BL");
+    const is1BlnKb = combinedKb.includes("1 BLN") || combinedKb.includes("CYCLO");
+    const isIudKb = combinedKb.includes("IUD");
+    const isImplantKb = combinedKb.includes("IMPLANT") || combinedKb.includes("SUSUK");
+    const isKondomKb = combinedKb.includes("KONDOM");
+
+    return isPilKb || is3BlnKb || is2BlnKb || is1BlnKb || isIudKb || isImplantKb || isKondomKb;
+  };
+
   // --- 2. FORMAT DATA UNTUK EXCEL ---
   const handleExport = async () => {
     const supabase = createClient();
     
-    // Kumpulkan patient_id unik untuk mengambil detail pasien
+    // Kumpulkan patient_id unik HANYA dari records yang lolos isKbRecord
     const patientIds = Array.from(
-      new Set(records.map((r) => r.patient_id).filter((id): id is string => Boolean(id)))
+      new Set(
+        records
+          .filter((r) => isKbRecord(r) && Boolean(r.patient_id))
+          .map((r) => r.patient_id as string)
+      )
     );
 
     interface PatientInfo {
@@ -88,20 +111,60 @@ export default function ExportExcelButton({ records }: ExportProps) {
 
     const patientMap = new Map<string, PatientInfo>();
 
+    // Chunking query per 100 ID untuk menghindari batas URL Cloudflare/Kong
     if (patientIds.length > 0) {
-      try {
-        const { data, error } = await supabase
-          .from("patients")
-          .select("id, nik, husband_name, birth_date, type")
-          .in("id", patientIds);
+      const BATCH_SIZE = 100;
+      const batches: string[][] = [];
+      for (let i = 0; i < patientIds.length; i += BATCH_SIZE) {
+        batches.push(patientIds.slice(i, i + BATCH_SIZE));
+      }
 
-        if (data && !error) {
-          data.forEach((p) => {
-            patientMap.set(p.id, p);
-          });
-        }
-      } catch (err) {
-        console.error("Gagal mengambil data pasien untuk register KB:", err);
+      const failedBatches: { batchNum: number; count: number; error: string }[] = [];
+
+      await Promise.all(
+        batches.map(async (batch, index) => {
+          const batchNum = index + 1;
+          try {
+            const { data, error } = await supabase
+              .from("patients")
+              .select("id, nik, husband_name, birth_date, type")
+              .in("id", batch);
+
+            if (error) {
+              console.error(
+                `[ExportExcel] Gagal mengambil batch ${batchNum} (${batch.length} ID):`,
+                error.message,
+                error
+              );
+              failedBatches.push({
+                batchNum,
+                count: batch.length,
+                error: error.message || "Error Supabase",
+              });
+            } else if (data) {
+              data.forEach((p) => {
+                patientMap.set(p.id, p);
+              });
+            }
+          } catch (err: any) {
+            console.error(
+              `[ExportExcel] Exception pada batch ${batchNum} (${batch.length} ID):`,
+              err
+            );
+            failedBatches.push({
+              batchNum,
+              count: batch.length,
+              error: err?.message || "Exception tidak terduga",
+            });
+          }
+        })
+      );
+
+      if (failedBatches.length > 0) {
+        const totalFailedIds = failedBatches.reduce((acc, b) => acc + b.count, 0);
+        alert(
+          `Peringatan: Gagal mengambil data detail untuk ${totalFailedIds} pasien (Batch: ${failedBatches.map((b) => b.batchNum).join(", ")}).\nKolom Nama Suami, NIK, atau Penjaminan di sheet REGISTER KB mungkin tidak lengkap.`
+        );
       }
     }
 
@@ -249,23 +312,21 @@ export default function ExportExcelButton({ records }: ExportProps) {
         kiaData.push(row);
 
         // --- SELEKSI & MAPPING DATA REGISTER KB ---
-        const combinedKb = (
-          (rec.diagnosis || "") + " " +
-          (rec.action || "") + " " +
-          (rec.therapy || "")
-        ).toUpperCase();
+        if (isKbRecord(rec)) {
+          const combinedKb = (
+            (rec.diagnosis || "") + " " +
+            (rec.action || "") + " " +
+            (rec.therapy || "")
+          ).toUpperCase();
 
-        const isPilKb = combinedKb.includes("PIL");
-        const is3BlnKb = combinedKb.includes("3 BLN") || combinedKb.includes("TRICLO") || combinedKb.includes("DEPO");
-        const is2BlnKb = combinedKb.includes("2 BLN") || combinedKb.includes("2BL");
-        const is1BlnKb = combinedKb.includes("1 BLN") || combinedKb.includes("CYCLO");
-        const isIudKb = combinedKb.includes("IUD");
-        const isImplantKb = combinedKb.includes("IMPLANT") || combinedKb.includes("SUSUK");
-        const isKondomKb = combinedKb.includes("KONDOM");
+          const isPilKb = combinedKb.includes("PIL");
+          const is3BlnKb = combinedKb.includes("3 BLN") || combinedKb.includes("TRICLO") || combinedKb.includes("DEPO");
+          const is2BlnKb = combinedKb.includes("2 BLN") || combinedKb.includes("2BL");
+          const is1BlnKb = combinedKb.includes("1 BLN") || combinedKb.includes("CYCLO");
+          const isIudKb = combinedKb.includes("IUD");
+          const isImplantKb = combinedKb.includes("IMPLANT") || combinedKb.includes("SUSUK");
+          const isKondomKb = combinedKb.includes("KONDOM");
 
-        const hasKb = isPilKb || is3BlnKb || is2BlnKb || is1BlnKb || isIudKb || isImplantKb || isKondomKb;
-
-        if (hasKb) {
           if (dateFormatted !== currentKbDate) {
             currentKbDate = dateFormatted;
             noKb = 1;
