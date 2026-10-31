@@ -18,6 +18,13 @@ interface MedicalRecord {
   diagnosis: string; action: string; therapy: string; staff_name: string;
   weight: number; blood_pressure: string; heart_rate: number; temperature: number; oxygen_saturation: number;
   service_fee: number; medicine_cost: number; total_price: number; risk_level: string;
+  height_cm?: number | null;
+  lp_cm?: number | null;
+  lila_cm?: number | null;
+  gds?: number | null;
+  tt_status?: string | null;
+  jumlah_anak?: number | null;
+  anak_terakhir?: string | null;
 }
 interface ModalProps {
   isOpen: boolean; onClose: () => void; recordToEdit?: MedicalRecord | null;
@@ -138,6 +145,7 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
   const [formData, setFormData] = useState({
     patient_id: "", visit_date: new Date().toISOString().split('T')[0], diagnosis: "", action: "",
     staff_name: "Bidan ", weight: "", blood_pressure: "", heart_rate: "", temperature: "", spo: "", service_fee: 0, risk_level: "",
+    height_cm: "", lp_cm: "", lila_cm: "", gds: "", tt_status: "", jumlah_anak: "", anak_terakhir: "",
   });
 
   // --- EFFECTS ---
@@ -164,6 +172,13 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
               heart_rate: recordToEdit.heart_rate?.toString() || "", temperature: recordToEdit.temperature?.toString() || "",
               spo: recordToEdit.oxygen_saturation?.toString() || "", service_fee: recordToEdit.service_fee,
               risk_level: recordToEdit.risk_level || "",
+              height_cm: recordToEdit.height_cm !== null && recordToEdit.height_cm !== undefined ? recordToEdit.height_cm.toString() : "",
+              lp_cm: recordToEdit.lp_cm !== null && recordToEdit.lp_cm !== undefined ? recordToEdit.lp_cm.toString() : "",
+              lila_cm: recordToEdit.lila_cm !== null && recordToEdit.lila_cm !== undefined ? recordToEdit.lila_cm.toString() : "",
+              gds: recordToEdit.gds !== null && recordToEdit.gds !== undefined ? recordToEdit.gds.toString() : "",
+              tt_status: recordToEdit.tt_status || "",
+              jumlah_anak: recordToEdit.jumlah_anak !== null && recordToEdit.jumlah_anak !== undefined ? recordToEdit.jumlah_anak.toString() : "",
+              anak_terakhir: recordToEdit.anak_terakhir || "",
           });
           setPatientQuery(recordToEdit.patient_name || ""); 
           checkPatientHistory(recordToEdit.patient_id); 
@@ -198,7 +213,8 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
           // --- NEW MODE ---
           setFormData({
              patient_id: "", visit_date: new Date().toISOString().split('T')[0], diagnosis: "", action: "",
-             staff_name: "Bidan ", weight: "", blood_pressure: "", heart_rate: "", temperature: "", spo: "", service_fee: 0, risk_level: ""
+             staff_name: "Bidan ", weight: "", blood_pressure: "", heart_rate: "", temperature: "", spo: "", service_fee: 0, risk_level: "",
+             height_cm: "", lp_cm: "", lila_cm: "", gds: "", tt_status: "", jumlah_anak: "", anak_terakhir: ""
           });
           setAncData({ husband_name: "", hpht: "", gravida: "", usg_type: "2D", leopold1: "", leopold2: "", leopold3: "", leopold4: "", djj: "" });
           setCalcResult({ uk: "", hpl: "" });
@@ -272,7 +288,7 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
       let finalDiagnosis = formData.diagnosis;
       let finalAction = formData.action;
       if (isAncMode) {
-          finalDiagnosis = `G${ancData.gravida} - ${formData.diagnosis}`; 
+          finalDiagnosis = ancData.gravida ? `${ancData.gravida} - ${formData.diagnosis}` : formData.diagnosis;
           const ancDetails = `\n\n[ANC Data]\nSuami: ${ancData.husband_name}\nUSG: ${ancData.usg_type}\nDJJ: ${ancData.djj}\nLeo 1-4: ${ancData.leopold1}/${ancData.leopold2}/${ancData.leopold3}/${ancData.leopold4}`;
           finalAction = `${formData.action}${ancDetails}`;
       }
@@ -290,7 +306,14 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
         oxygen_saturation: parseFloat(formData.spo) || 0, diagnosis: finalDiagnosis, action: finalAction,
         therapy: finalTherapy, 
         staff_name: formData.staff_name, risk_level: formData.risk_level, 
-        medicine_cost: medicineTotal, service_fee: formData.service_fee, total_price: grandTotal
+        medicine_cost: medicineTotal, service_fee: formData.service_fee, total_price: grandTotal,
+        height_cm: parseFloat(formData.height_cm) || null,
+        lp_cm: parseFloat(formData.lp_cm) || null,
+        lila_cm: parseFloat(formData.lila_cm) || null,
+        gds: parseFloat(formData.gds) || null,
+        tt_status: formData.tt_status.trim() || null,
+        jumlah_anak: formData.jumlah_anak !== "" && !isNaN(parseInt(formData.jumlah_anak)) ? parseInt(formData.jumlah_anak) : null,
+        anak_terakhir: formData.anak_terakhir.trim() || null,
       };
 
       let recordId = recordToEdit?.id;
@@ -438,6 +461,22 @@ export default function AddMedicalRecordModal({ isOpen, onClose, recordToEdit }:
                         <div><label className="text-[10px] uppercase text-gray-400">Nadi</label><input type="number" className="w-full p-2 border rounded-lg text-sm" value={formData.heart_rate} onChange={(e) => setFormData({...formData, heart_rate: e.target.value})} /></div>
                         <div><label className="text-[10px] uppercase text-gray-400">Suhu (C)</label><input type="number" step="0.1" className="w-full p-2 border rounded-lg text-sm" value={formData.temperature} onChange={(e) => setFormData({...formData, temperature: e.target.value})} /></div>
                         <div><label className="text-[10px] uppercase text-gray-400">SPO2 (%)</label><input type="number" className="w-full p-2 border rounded-lg text-sm" value={formData.spo} onChange={(e) => setFormData({...formData, spo: e.target.value})} /></div>
+                    </div>
+                  </div>
+
+                  {/* DATA TAMBAHAN LAPORAN (OPSIONAL) */}
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <h4 className="text-sm font-bold text-gray-700 mb-3">Data Tambahan Laporan <span className="text-xs font-normal text-gray-400">(Opsional)</span></h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div><label className="text-[10px] uppercase text-gray-400">TB/PB (cm)</label><input type="number" step="0.1" placeholder="Contoh: 155" className="w-full p-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" value={formData.height_cm} onChange={(e) => setFormData({...formData, height_cm: e.target.value})} /></div>
+                        <div><label className="text-[10px] uppercase text-gray-400">Lingkar Perut (cm)</label><input type="number" step="0.1" placeholder="Contoh: 80" className="w-full p-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" value={formData.lp_cm} onChange={(e) => setFormData({...formData, lp_cm: e.target.value})} /></div>
+                        <div><label className="text-[10px] uppercase text-gray-400">LILA (cm)</label><input type="number" step="0.1" placeholder="Contoh: 24.5" className="w-full p-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" value={formData.lila_cm} onChange={(e) => setFormData({...formData, lila_cm: e.target.value})} /></div>
+                        <div><label className="text-[10px] uppercase text-gray-400">GDS (mg/dL)</label><input type="number" step="0.1" placeholder="Contoh: 110" className="w-full p-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" value={formData.gds} onChange={(e) => setFormData({...formData, gds: e.target.value})} /></div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                        <div><label className="text-[10px] uppercase text-gray-400">Status TT</label><input type="text" placeholder="Mis. TT1/TT2/TT3" className="w-full p-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" value={formData.tt_status} onChange={(e) => setFormData({...formData, tt_status: e.target.value})} /></div>
+                        <div><label className="text-[10px] uppercase text-gray-400">Jumlah Anak</label><input type="number" min="0" placeholder="Contoh: 2" className="w-full p-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" value={formData.jumlah_anak} onChange={(e) => setFormData({...formData, jumlah_anak: e.target.value})} /></div>
+                        <div><label className="text-[10px] uppercase text-gray-400">Anak Terakhir</label><input type="text" placeholder="Contoh: L / 12-03-2024" className="w-full p-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" value={formData.anak_terakhir} onChange={(e) => setFormData({...formData, anak_terakhir: e.target.value})} /></div>
                     </div>
                   </div>
 
