@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+/template-laporan-standar.xlsx
 
 # debug
 npm-debug.log*

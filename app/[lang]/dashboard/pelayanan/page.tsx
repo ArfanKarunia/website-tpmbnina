@@ -6,7 +6,7 @@ import { Search, Plus, User, FileText, Activity, Eye, Pencil, Trash2, CalendarDa
 import AddMedicalRecordModal from "../AddMedicalRecordModal";
 import MedicalRecordDetailModal from "../MedicalRecordDetailModal"; 
 import ActionModal from "../ActionModal"; 
-import ExportExcelButton from "../ExportExcelButton";
+import LaporanBulananButton from "../LaporanBulananButton";
 
 interface MedicalRecord {
   id: string;
@@ -169,8 +169,7 @@ export default function PelayananPage() {
            <p className="text-gray-500 text-sm">Rekapitulasi pemeriksaan pasien harian.</p>
         </div>
         <div className="flex gap-3">
-        {/* Tombol Export sekarang langsung mengambil data records (karena sudah difilter server) */}
-        <ExportExcelButton records={records} />
+                  <LaporanBulananButton />
         <button 
           onClick={() => { setSelectedRecord(null); setIsFormOpen(true); }}
           className="bg-blue-600 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all"
