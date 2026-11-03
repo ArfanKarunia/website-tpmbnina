@@ -699,3 +699,150 @@ export function keTanggalId(isoDate: string | null | undefined): string {
   return trimmed;
 }
 
+// ============================================================================
+// 14. Modul Persalinan & BBL untuk Laporan Bulanan
+// ============================================================================
+
+export interface PersalinanLaporanBayi {
+  id: string;
+  nama_bayi: string | null;
+  jenis_kelamin: "L" | "P" | null;
+  bbl_gram: number | null;
+  pbl_cm: number | null;
+  lk_cm: number | null;
+  ld_cm: number | null;
+  spo2_tangan_kanan: number | null;
+  spo2_kaki: number | null;
+  skrining_shk: "YA" | "TIDAK" | "Pending" | null;
+}
+
+export interface PersalinanLaporanRecord {
+  id: string;
+  patient_id: string;
+  delivery_datetime: string;
+  tempat: "TPMB" | "LUAR";
+  tempat_luar_nama?: string | null;
+  normal: boolean;
+  rujuk: boolean;
+  tujuan_rujuk?: string | null;
+  keterangan?: string | null;
+  staff_name?: string | null;
+  patient_name?: string | null;
+  patient_nik?: string | null;
+  patient_birth_date?: string | null;
+  patient_address?: string | null;
+  patient_husband_name?: string | null;
+  patient_phone?: string | null;
+  patient_type?: string | null;
+  bayi_list: PersalinanLaporanBayi[];
+}
+
+export interface PersalinanSheetRow {
+  no: number;
+  namaPasien: string;
+  nikPasien: string;
+  tglLahir: string;
+  alamat: string;
+  namaSuami: string;
+  noWhatsapp: string;
+  rujukTidak: string; // 'RUJUK (tujuan)' atau 'TIDAK'
+  np: string; // 'V' jika normal
+  tglJamPersalinan: string;
+  namaBayi: string;
+  jenisKelamin: string; // 'L' atau 'P'
+  bbl: number | string;
+  pbl: number | string;
+  lk: number | string;
+  ld: number | string;
+  spo2Tangan: number | string;
+  spo2Kaki: number | string;
+  shkYa: string; // 'V' jika YA, '' jika TIDAK / Pending / null
+  shkTidak: string; // 'V' jika TIDAK, '' jika YA / Pending / null
+  pkgSudah: string; // ''
+  pkgBelum: string; // 'V'
+  keterangan: string;
+}
+
+/**
+ * Filter persalinan berdasarkan bulan dan tahun delivery_datetime, dan HANYA tempat = 'TPMB'.
+ */
+export function filterPersalinanBulan(
+  records: PersalinanLaporanRecord[],
+  tahun: number,
+  bulan: number
+): PersalinanLaporanRecord[] {
+  return records.filter((r) => {
+    if (r.tempat !== "TPMB") return false;
+    if (!r.delivery_datetime) return false;
+    const d = new Date(r.delivery_datetime);
+    if (isNaN(d.getTime())) return false;
+    return d.getFullYear() === tahun && d.getMonth() + 1 === bulan;
+  });
+}
+
+/**
+ * Bentuk baris-baris sheet PERSALINAN - BBL.
+ * Setiap bayi menghasilkan SATU baris. Jika ibu punya anak kembar, menghasilkan dua baris.
+ */
+export function bentukBarisPersalinan(
+  records: PersalinanLaporanRecord[]
+): PersalinanSheetRow[] {
+  const rows: PersalinanSheetRow[] = [];
+  let no = 1;
+
+  for (const rec of records) {
+    const d = new Date(rec.delivery_datetime);
+    const tglJamStr = isNaN(d.getTime())
+      ? rec.delivery_datetime
+      : `${keTanggalId(d.toISOString().slice(0, 10))} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+    const rujukStr = rec.rujuk
+      ? rec.tujuan_rujuk ? `RUJUK (${rec.tujuan_rujuk})` : "RUJUK"
+      : "TIDAK";
+
+    const npStr = rec.normal ? "V" : "";
+
+    // Jika bayi_list kosong, buat minimal 1 baris
+    const babies = rec.bayi_list && rec.bayi_list.length > 0 ? rec.bayi_list : [null];
+
+    for (const b of babies) {
+      let shkYa = "";
+      let shkTidak = "";
+      if (b && b.skrining_shk === "YA") {
+        shkYa = "V";
+      } else if (b && b.skrining_shk === "TIDAK") {
+        shkTidak = "V";
+      }
+      // Bila null atau 'Pending', keduanya tetap "" (dikosongkan sesuai instruksi)
+
+      rows.push({
+        no: no++,
+        namaPasien: (rec.patient_name || "").toUpperCase(),
+        nikPasien: rec.patient_nik || "-",
+        tglLahir: rec.patient_birth_date ? keTanggalId(rec.patient_birth_date) : "-",
+        alamat: (rec.patient_address || "-").toUpperCase(),
+        namaSuami: (rec.patient_husband_name || "-").toUpperCase(),
+        noWhatsapp: rec.patient_phone || "-",
+        rujukTidak: rujukStr,
+        np: npStr,
+        tglJamPersalinan: tglJamStr,
+        namaBayi: b?.nama_bayi ? b.nama_bayi.toUpperCase() : "-",
+        jenisKelamin: b?.jenis_kelamin || "-",
+        bbl: b?.bbl_gram ?? "-",
+        pbl: b?.pbl_cm ?? "-",
+        lk: b?.lk_cm ?? "-",
+        ld: b?.ld_cm ?? "-",
+        spo2Tangan: b?.spo2_tangan_kanan ?? "-",
+        spo2Kaki: b?.spo2_kaki ?? "-",
+        shkYa,
+        shkTidak,
+        pkgSudah: "",
+        pkgBelum: "V",
+        keterangan: rec.keterangan || (rec.staff_name ? `Bidan: ${rec.staff_name}` : ""),
+      });
+    }
+  }
+
+  return rows;
+}
+

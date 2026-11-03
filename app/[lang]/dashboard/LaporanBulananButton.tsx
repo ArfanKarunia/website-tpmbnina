@@ -29,6 +29,9 @@ import {
   MedicalRecordInput,
   KodePenyakit,
   KelompokUmur,
+  filterPersalinanBulan,
+  bentukBarisPersalinan,
+  PersalinanLaporanRecord,
 } from "@/lib/laporanBulanan";
 
 interface PatientInfo {
@@ -349,6 +352,75 @@ export default function LaporanBulananButton() {
       }
 
       // ------------------------------------------------------------------------
+      // c2. Ambil data persalinan & bayi baru lahir dengan paginasi
+      // ------------------------------------------------------------------------
+      setStatusMessage("Mengambil data persalinan & bayi baru lahir...");
+      let fromPersalinan = 0;
+      let allPersalinanRaw: any[] = [];
+      let hasMorePersalinan = true;
+
+      while (hasMorePersalinan) {
+        const { data: pData, error: pError } = await supabase
+          .from("persalinan")
+          .select("*, patients(name, nik, birth_date, address, husband_name, phone, type), persalinan_bayi(*)")
+          .gte("delivery_datetime", `${startDate}T00:00:00+07:00`)
+          .lte("delivery_datetime", `${endDate}T23:59:59.999+07:00`)
+          .order("delivery_datetime", { ascending: true })
+          .range(fromPersalinan, fromPersalinan + PAGE_SIZE - 1);
+
+        if (pError) {
+          throw new Error(`Gagal mengambil data persalinan: ${pError.message}`);
+        }
+
+        if (pData && pData.length > 0) {
+          allPersalinanRaw = allPersalinanRaw.concat(pData);
+          if (pData.length < PAGE_SIZE) {
+            hasMorePersalinan = false;
+          } else {
+            fromPersalinan += PAGE_SIZE;
+          }
+        } else {
+          hasMorePersalinan = false;
+        }
+      }
+
+      const persalinanRecords: PersalinanLaporanRecord[] = allPersalinanRaw.map((p) => ({
+        id: p.id,
+        patient_id: p.patient_id,
+        delivery_datetime: p.delivery_datetime,
+        tempat: p.tempat,
+        tempat_luar_nama: p.tempat_luar_nama,
+        normal: p.normal,
+        rujuk: p.rujuk,
+        tujuan_rujuk: p.tujuan_rujuk,
+        keterangan: p.keterangan,
+        staff_name: p.staff_name,
+        patient_name: p.patients?.name || "",
+        patient_nik: p.patients?.nik || "",
+        patient_birth_date: p.patients?.birth_date || "",
+        patient_address: p.patients?.address || "",
+        patient_husband_name: p.patients?.husband_name || "",
+        patient_phone: p.patients?.phone || "",
+        patient_type: p.patients?.type || "",
+        bayi_list: (p.persalinan_bayi || []).map((b: any) => ({
+          id: b.id,
+          nama_bayi: b.nama_bayi,
+          jenis_kelamin: b.jenis_kelamin,
+          bbl_gram: b.bbl_gram,
+          pbl_cm: b.pbl_cm,
+          lk_cm: b.lk_cm,
+          ld_cm: b.ld_cm,
+          spo2_tangan_kanan: b.spo2_tangan_kanan,
+          spo2_kaki: b.spo2_kaki,
+          skrining_shk: b.skrining_shk,
+        })),
+      }));
+
+      // Filter: Hanya TPMB dan delivery_datetime pada bulan terpilih
+      const monthlyPersalinan = filterPersalinanBulan(persalinanRecords, year, month);
+      const persalinanRows = bentukBarisPersalinan(monthlyPersalinan);
+
+      // ------------------------------------------------------------------------
       // d. Buka template Excel menggunakan fetch
       // ------------------------------------------------------------------------
       setStatusMessage("Mempersiapkan format laporan Excel...");
@@ -383,7 +455,8 @@ export default function LaporanBulananButton() {
       }
 
       // ------------------------------------------------------------------------
-      // f. Sisipkan 2 kolom UMUM & BPJS pada 3 sheet yang memerlukan
+      // f. Sisipkan 2 kolom UMUM & BPJS pada sheet yang memerlukan (HAMIL & KB)
+      // Catatan: Sheet PERSALINAN - BBL di template tidak memiliki kolom UMUM/BPJS
       // ------------------------------------------------------------------------
       const wsAnc = wb.getWorksheet("HAMIL (ANC)");
       if (wsAnc) insertUmumBpjsBeforePkg(wsAnc, 12);
@@ -391,20 +464,19 @@ export default function LaporanBulananButton() {
       const wsKb = wb.getWorksheet("KB");
       if (wsKb) insertUmumBpjsBeforePkg(wsKb, 11);
 
-      const wsPersalinan = wb.getWorksheet("PERSALINAN - BBL");
-      if (wsPersalinan) insertUmumBpjsBeforePkg(wsPersalinan, 21);
-
       // ------------------------------------------------------------------------
-      // g. Isi data kunjungan bulan terpilih ke 4 sheet rincian
+      // g. Isi data kunjungan & persalinan bulan terpilih ke 5 sheet rincian
       // ------------------------------------------------------------------------
-      setStatusMessage("Menulis data rincian pasien...");
+      setStatusMessage("Menulis data rincian pasien & persalinan...");
       const wsBalita = wb.getWorksheet("BALITA-SAKIT");
       const wsUmum = wb.getWorksheet("UMUM-SAKIT");
+      const wsPersalinan = wb.getWorksheet("PERSALINAN - BBL");
 
       let balitaCount = 0;
       let umumCount = 0;
       let ancCount = 0;
       let kbCount = 0;
+      let persalinanCount = 0;
 
       // Helper untuk menerapkan styling sel data
       const applyDataRowStyle = (row: ExcelJS.Row) => {
@@ -418,6 +490,40 @@ export default function LaporanBulananButton() {
           };
         });
       };
+
+      // Tulis data persalinan ke sheet PERSALINAN - BBL
+      if (wsPersalinan && persalinanRows.length > 0) {
+        for (const r of persalinanRows) {
+          persalinanCount++;
+          const rowValues = [
+            r.no,               // Col 1: NO
+            r.namaPasien,       // Col 2: NAMA PASIEN
+            r.nikPasien,        // Col 3: NIK PASIEN
+            r.tglLahir,          // Col 4: TGL LAHIR
+            r.alamat,           // Col 5: ALAMAT (SESUAI KTP)
+            r.namaSuami,        // Col 6: NAMA SUAMI
+            r.noWhatsapp,       // Col 7: NO WHATSAPP AKTIF
+            r.rujukTidak,       // Col 8: RUJUK/TIDAK
+            r.np,               // Col 9: NP
+            r.tglJamPersalinan, // Col 10: TGL & JAM PERSALINAN
+            r.namaBayi,         // Col 11: NAMA BAYI
+            r.jenisKelamin,     // Col 12: JENIS KELAMIN BAYI (L/P)
+            r.bbl,              // Col 13: BBL
+            r.pbl,              // Col 14: PBL
+            r.lk,               // Col 15: LK
+            r.ld,               // Col 16: LD
+            r.spo2Tangan,       // Col 17: SpO2 tangan kanan
+            r.spo2Kaki,         // Col 18: SpO2 kaki
+            r.shkYa,            // Col 19: YA (SHK)
+            r.shkTidak,         // Col 20: TIDAK (SHK)
+            r.pkgSudah,         // Col 21: SUDAH (STATUS INPUT PKG)
+            r.pkgBelum,         // Col 22: BELUM (STATUS INPUT PKG)
+            r.keterangan,       // Col 23: KETERANGAN
+          ];
+          const newRow = wsPersalinan.addRow(rowValues);
+          applyDataRowStyle(newRow);
+        }
+      }
 
       for (const rec of filteredRecords) {
         const targetSheet = tentukanSheet(rec);
@@ -824,7 +930,7 @@ export default function LaporanBulananButton() {
         umumCount,
         ancCount,
         kbCount,
-        persalinanCount: 0,
+        persalinanCount: persalinanCount,
         ptmCount: totalPtmDiagnoses,
         pmCount: totalPmDiagnoses,
         excludedNullCount: excludedNullVisitDateCount,

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import AddReservationModal from "./AddReservationModal"; 
+import { hitungKehamilan } from "@/lib/statusKehamilan"; 
 
 type SessionData = {
   id: string;
@@ -32,9 +33,11 @@ type SmartMom = {
   hpht: string;
   hpl: string;
   usiaKehamilan: number;
+  usiaKehamilanHari: number;
   trimester: number;
   status: string;
   phone: string;
+  statusKategori: "Aktif" | "Follow-up";
 };
 
 export default function DashboardPage() {
@@ -58,30 +61,7 @@ export default function DashboardPage() {
 
   const [ancPatients, setAncPatients] = useState<SmartMom[]>([]);
 
-  // --- HELPER ---
-  const calculatePregnancy = (hphtDate: string) => {
-      const hpht = new Date(hphtDate);
-      const today = new Date();
-      const diffTime = Math.abs(today.getTime() - hpht.getTime());
-      const weeks = Math.floor(Math.ceil(diffTime / (1000 * 60 * 60 * 24)) / 7);
-      const hplDate = new Date(hpht);
-      hplDate.setDate(hplDate.getDate() + 280);
-      
-      let trimester = 1;
-      let status = "Kontrol Rutin";
-      if (weeks > 13 && weeks <= 27) trimester = 2;
-      else if (weeks > 27) {
-          trimester = 3;
-          status = weeks >= 37 ? "SIAGA PERSALINAN" : "Pantau Gerak Janin";
-      }
 
-      return { 
-          weeks, 
-          hpl: hplDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }), 
-          status, 
-          trimester 
-      };
-  };
 
   const fetchDashboardData = async () => {
       setLoading(true);
@@ -156,39 +136,34 @@ export default function DashboardPage() {
 
       // Fetch Ibu Hamil
       const { data: moms } = await supabase
-  .from('patients')
-  .select('*')
-  .not('hpht', 'is', null);
-  // Hapus order dan limit di sini! Kita lakukan filternya pakai Javascript di bawah.
-      
-if (moms) {
-  const processedMoms = moms
-    .map((m) => {
-      const calc = calculatePregnancy(m.hpht);
-      return {
-        id: m.id, 
-        name: m.name, 
-        hpht: m.hpht, 
-        phone: m.phone,
-        // Cek nama properti dari fungsi calculatePregnancy-mu, apakah 'uk' atau 'weeks'
-        usiaKehamilan: calc.weeks !== undefined ? calc.weeks : calc.weeks, 
-        hpl: calc.hpl, 
-        status: calc.status, 
-        trimester: calc.trimester
-      };
-    })
-    // 1. FILTER: Buang pasien ghaib yang sudah melahirkan (> 42 minggu)
-    .filter(mom => mom.usiaKehamilan !== undefined && mom.usiaKehamilan >= 0 && mom.usiaKehamilan <= 42)
-    
-    // 2. SORTING: Urutkan dari usia paling besar (Misal: 38 minggu di atas, 4 minggu di bawah)
-    // Tujuannya agar Bidan Nina fokus ke pasien yang mau lahiran dulu.
-    .sort((a, b) => b.usiaKehamilan - a.usiaKehamilan)
-    
-    // 3. LIMIT: Baru kita ambil 5 orang teratas untuk di widget Dashboard
-    .slice(0, 5);
+        .from('patients')
+        .select('*')
+        .not('hpht', 'is', null);
 
-  setAncPatients(processedMoms);
-}
+      if (moms) {
+        const processedMoms: SmartMom[] = moms
+          .map((m) => {
+            const calc = hitungKehamilan(m.hpht);
+            return {
+              id: m.id,
+              name: m.name,
+              hpht: m.hpht,
+              phone: m.phone || "",
+              usiaKehamilan: calc.ukWeeks,
+              usiaKehamilanHari: calc.ukDays,
+              hpl: calc.hplFormatted,
+              trimester: calc.trimester,
+              status: calc.statusText,
+              statusKategori: calc.status === "PERLU_FOLLOW_UP" ? ("Follow-up" as const) : ("Aktif" as const),
+              rawStatus: calc.status,
+            };
+          })
+          .filter(mom => mom.rawStatus === "HAMIL_AKTIF" || mom.rawStatus === "PERLU_FOLLOW_UP")
+          .sort((a, b) => b.usiaKehamilan - a.usiaKehamilan)
+          .slice(0, 5);
+
+        setAncPatients(processedMoms);
+      }
 setLoading(false);
   };
 
@@ -310,32 +285,74 @@ setLoading(false);
               <span className="text-[10px] bg-pink-50 text-pink-600 px-2 py-1 rounded-full font-bold">Auto-HPL</span>
             </div>
             <div className="space-y-4">
-              {/* --- KITA TAMBAHKAN FILTER MAKSIMAL 42 MINGGU DI SINI --- */}
-              {ancPatients.filter(mom => mom.usiaKehamilan >= 0 && mom.usiaKehamilan <= 42).length > 0 ? 
-                ancPatients
-                  .filter(mom => mom.usiaKehamilan >= 0 && mom.usiaKehamilan <= 42)
-                  .map((mom, idx) => (
-                <div key={idx} className={`p-4 rounded-xl border transition-all group bg-white ${mom.usiaKehamilan >= 37 ? 'border-red-200 bg-red-50/50' : 'border-gray-100 hover:border-pink-200'}`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h4 className="font-bold text-gray-800 text-sm flex items-center gap-2">{mom.name} {mom.trimester === 3 && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}</h4>
-                      <p className="text-xs text-gray-500">HPL: <span className="font-mono font-bold text-gray-700">{mom.hpl}</span></p>
-                    </div>
-                    <div className="text-right">
-                        <span className="block text-xl font-bold text-pink-600">{mom.usiaKehamilan}</span>
+              {ancPatients.length > 0 ? (
+                ancPatients.map((mom) => (
+                  <div
+                    key={mom.id}
+                    className={`p-4 rounded-xl border transition-all group bg-white ${
+                      mom.statusKategori === 'Follow-up'
+                        ? 'border-amber-300 bg-amber-50/40'
+                        : mom.usiaKehamilan >= 37
+                        ? 'border-red-200 bg-red-50/50'
+                        : 'border-gray-100 hover:border-pink-200'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h4 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                          {mom.name}{' '}
+                          {mom.trimester === 3 && (
+                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                          )}
+                        </h4>
+                        <p className="text-xs text-gray-500">
+                          HPL: <span className="font-mono font-bold text-gray-700">{mom.hpl}</span>
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="block text-xl font-bold text-pink-600">
+                          {mom.usiaKehamilan}
+                        </span>
                         <span className="text-[10px] text-gray-400">Minggu</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100/50">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {mom.statusKategori === 'Follow-up' ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                            Follow-up
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-100 text-pink-600 border border-pink-200">
+                            Aktif
+                          </span>
+                        )}
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            mom.usiaKehamilan >= 37
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-blue-50 text-blue-600'
+                          }`}
+                        >
+                          {mom.status}
+                        </span>
+                      </div>
+                      <a
+                        href={`https://wa.me/${mom.phone}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors shadow-sm shrink-0"
+                      >
+                        <MessageCircle size={12} /> Hubungi
+                      </a>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100/50">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${mom.usiaKehamilan >= 37 ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'}`}>{mom.status}</span>
-                    <a href={`https://wa.me/${mom.phone}`} target="_blank" className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors shadow-sm"><MessageCircle size={12} /> Hubungi</a>
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-400 text-sm italic">
+                  <Baby size={32} className="mx-auto mb-2 opacity-20" />
+                  Belum ada data bumil aktif.
                 </div>
-              )) : (
-                  <div className="text-center py-8 text-gray-400 text-sm italic">
-                    <Baby size={32} className="mx-auto mb-2 opacity-20"/>
-                    Belum ada data bumil aktif.
-                  </div>
               )}
             </div>
             <Link href="/dashboard/kehamilan" className="block w-full mt-6 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors text-center">

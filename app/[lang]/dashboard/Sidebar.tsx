@@ -17,7 +17,8 @@ import {
   X,
   Settings2,
   ShieldCheck,
-  PieChart 
+  PieChart,
+  Baby
 } from "lucide-react";
 
 interface SidebarProps {
@@ -76,6 +77,7 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen }: SidebarProp
   const mainMenus = [
     { name: "Beranda", href: "/dashboard", icon: LayoutDashboard },
     { name: "Pelayanan", href: "/dashboard/pelayanan", icon: Stethoscope },
+    { name: "Kehamilan & Persalinan", href: "/dashboard/kehamilan", icon: Baby },
     { name: "Protokol Obat", href: "/dashboard/protokol-obat", icon: Pill, showOwnerBadge: true },
     { name: "Data Pasien", href: "/dashboard/pasien", icon: Users },
     { name: "Keuangan", href: "/dashboard/keuangan", icon: Wallet },
