@@ -19,7 +19,8 @@ import {
   AlertCircle, 
   Clock,
   Activity,
-  UserCheck
+  UserCheck,
+  Plus
 } from "lucide-react";
 import Link from "next/link";
 import AncHistoryModal from "./AncHistoryModal"; 
@@ -69,6 +70,8 @@ interface PersalinanRecord {
   tujuan_rujuk: string | null;
   keterangan: string | null;
   staff_name: string | null;
+  diperbarui_oleh?: string | null;
+  diperbarui_pada?: string | null;
   patients?: {
     name: string;
     phone?: string;
@@ -76,6 +79,20 @@ interface PersalinanRecord {
     husband_name?: string;
   } | null;
   persalinan_bayi?: PersalinanBayiItem[];
+}
+
+interface EditBayiDraft {
+  tempId: string;
+  id?: string;
+  nama_bayi: string;
+  jenis_kelamin: "L" | "P";
+  bbl_gram: string;
+  pbl_cm: string;
+  lk_cm: string;
+  ld_cm: string;
+  spo2_tangan_kanan: number | null;
+  spo2_kaki: number | null;
+  skrining_shk: "YA" | "TIDAK" | "Pending" | null;
 }
 
 export default function KehamilanPage() {
@@ -98,6 +115,29 @@ export default function KehamilanPage() {
   const [luarTempat, setLuarTempat] = useState("");
   const [luarKet, setLuarKet] = useState("");
   const [isSavingLuar, setIsSavingLuar] = useState(false);
+
+  // Helper konversi ISO ke datetime-local (WIB)
+  const isoToDateTimeLocal = (isoStr: string | null | undefined): string => {
+    if (!isoStr) return "";
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  // State Modal Edit Persalinan
+  const [editingPersalinan, setEditingPersalinan] = useState<PersalinanRecord | null>(null);
+  const [editTempat, setEditTempat] = useState<"TPMB" | "LUAR">("TPMB");
+  const [editTempatLuarNama, setEditTempatLuarNama] = useState<string>("");
+  const [editDeliveryDateTime, setEditDeliveryDateTime] = useState<string>("");
+  const [editNormal, setEditNormal] = useState<boolean>(true);
+  const [editRujuk, setEditRujuk] = useState<boolean>(false);
+  const [editTujuanRujuk, setEditTujuanRujuk] = useState<string>("");
+  const [editKeterangan, setEditKeterangan] = useState<string>("");
+  const [editStaffPengubah, setEditStaffPengubah] = useState<string>("");
+  const [editBayiList, setEditBayiList] = useState<EditBayiDraft[]>([]);
+  const [deletedBabyIds, setDeletedBabyIds] = useState<string[]>([]);
+  const [isSavingPersalinan, setIsSavingPersalinan] = useState<boolean>(false);
 
   // Modal Edit Skrining Bayi
   const [editingBaby, setEditingBaby] = useState<{
@@ -232,6 +272,279 @@ export default function KehamilanPage() {
       alert("Terjadi kesalahan: " + (err?.message || ""));
     } finally {
       setIsSavingLuar(false);
+    }
+  };
+
+  // Modal Edit Persalinan Handlers
+  const handleOpenEditPersalinan = (rec: PersalinanRecord) => {
+    setEditingPersalinan(rec);
+    setEditTempat(rec.tempat);
+    setEditTempatLuarNama(rec.tempat_luar_nama || "");
+    setEditDeliveryDateTime(isoToDateTimeLocal(rec.delivery_datetime));
+    setEditNormal(rec.normal ?? true);
+    setEditRujuk(rec.rujuk ?? false);
+    setEditTujuanRujuk(rec.tujuan_rujuk || "");
+    setEditKeterangan(rec.keterangan || "");
+    setEditStaffPengubah("");
+    setDeletedBabyIds([]);
+
+    const babies: EditBayiDraft[] = (rec.persalinan_bayi || []).map((b, idx) => ({
+      tempId: b.id || `existing_${idx}`,
+      id: b.id,
+      nama_bayi: b.nama_bayi || "",
+      jenis_kelamin: (b.jenis_kelamin as "L" | "P") || "L",
+      bbl_gram: b.bbl_gram !== null && b.bbl_gram !== undefined ? String(b.bbl_gram) : "",
+      pbl_cm: b.pbl_cm !== null && b.pbl_cm !== undefined ? String(b.pbl_cm) : "",
+      lk_cm: b.lk_cm !== null && b.lk_cm !== undefined ? String(b.lk_cm) : "",
+      ld_cm: b.ld_cm !== null && b.ld_cm !== undefined ? String(b.ld_cm) : "",
+      spo2_tangan_kanan: b.spo2_tangan_kanan,
+      spo2_kaki: b.spo2_kaki,
+      skrining_shk: b.skrining_shk,
+    }));
+
+    if (rec.tempat === "TPMB" && babies.length === 0) {
+      babies.push({
+        tempId: `new_${Date.now()}`,
+        nama_bayi: `Bayi Ny. ${rec.patients?.name || ""}`,
+        jenis_kelamin: "L",
+        bbl_gram: "",
+        pbl_cm: "",
+        lk_cm: "",
+        ld_cm: "",
+        spo2_tangan_kanan: null,
+        spo2_kaki: null,
+        skrining_shk: null,
+      });
+    }
+
+    setEditBayiList(babies);
+  };
+
+  const handleToggleTempat = (targetTempat: "TPMB" | "LUAR") => {
+    if (targetTempat === editTempat) return;
+    if (editTempat === "TPMB" && targetTempat === "LUAR") {
+      const ok = window.confirm(
+        "Ubah ke LUAR akan menghapus seluruh data bayi yang tersimpan untuk persalinan ini."
+      );
+      if (!ok) return;
+      const toDelete = editBayiList.filter((b) => b.id).map((b) => b.id as string);
+      setDeletedBabyIds((prev) => Array.from(new Set([...prev, ...toDelete])));
+      setEditBayiList([]);
+      setEditTempat("LUAR");
+    } else if (editTempat === "LUAR" && targetTempat === "TPMB") {
+      setEditTempat("TPMB");
+      if (editBayiList.length === 0) {
+        setEditBayiList([
+          {
+            tempId: `new_${Date.now()}`,
+            nama_bayi: `Bayi Ny. ${editingPersalinan?.patients?.name || ""}`,
+            jenis_kelamin: "L",
+            bbl_gram: "",
+            pbl_cm: "",
+            lk_cm: "",
+            ld_cm: "",
+            spo2_tangan_kanan: null,
+            spo2_kaki: null,
+            skrining_shk: null,
+          },
+        ]);
+      }
+    }
+  };
+
+  const handleAddEditBayi = () => {
+    setEditBayiList((prev) => [
+      ...prev,
+      {
+        tempId: `new_${Date.now()}_${prev.length}`,
+        nama_bayi: `Bayi ${prev.length + 1}`,
+        jenis_kelamin: "L",
+        bbl_gram: "",
+        pbl_cm: "",
+        lk_cm: "",
+        ld_cm: "",
+        spo2_tangan_kanan: null,
+        spo2_kaki: null,
+        skrining_shk: null,
+      },
+    ]);
+  };
+
+  const handleDeleteEditBayi = (index: number) => {
+    if (editBayiList.length <= 1) {
+      alert("Minimal harus ada satu data bayi untuk persalinan di TPMB.");
+      return;
+    }
+    const baby = editBayiList[index];
+    if (baby.id) {
+      setDeletedBabyIds((prev) => [...prev, baby.id as string]);
+    }
+    setEditBayiList((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateBabyField = (
+    index: number,
+    field: keyof EditBayiDraft,
+    value: any
+  ) => {
+    setEditBayiList((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handleSaveEditPersalinan = async () => {
+    if (!editingPersalinan) return;
+
+    if (!editStaffPengubah.trim()) {
+      alert("Nama staff pengubah wajib diisi untuk riwayat audit.");
+      return;
+    }
+    if (!editDeliveryDateTime) {
+      alert("Waktu persalinan wajib diisi.");
+      return;
+    }
+
+    const deliveryDateObj = new Date(editDeliveryDateTime);
+    if (isNaN(deliveryDateObj.getTime())) {
+      alert("Format waktu persalinan tidak valid.");
+      return;
+    }
+    const deliveryIso = deliveryDateObj.toISOString();
+
+    const isTpmb = editTempat === "TPMB";
+    if (!isTpmb) {
+      if (!editTempatLuarNama.trim()) {
+        alert("Nama tempat persalinan luar wajib diisi.");
+        return;
+      }
+    } else {
+      if (editBayiList.length === 0) {
+        alert("Minimal harus ada satu data bayi untuk persalinan di TPMB.");
+        return;
+      }
+      for (let i = 0; i < editBayiList.length; i++) {
+        const b = editBayiList[i];
+        if (!b.nama_bayi.trim()) {
+          alert(`Nama bayi ke-${i + 1} wajib diisi.`);
+          return;
+        }
+        if (!b.jenis_kelamin) {
+          alert(`Jenis kelamin bayi ke-${i + 1} wajib dipilih.`);
+          return;
+        }
+        if (!b.bbl_gram || isNaN(parseFloat(b.bbl_gram)) || parseFloat(b.bbl_gram) <= 0) {
+          alert(`Berat Badan Lahir (BBL) bayi ke-${i + 1} wajib diisi angka positif.`);
+          return;
+        }
+      }
+    }
+
+    setIsSavingPersalinan(true);
+    const nowIso = new Date().toISOString();
+    const staffName = editStaffPengubah.trim();
+
+    try {
+      // 1. UPDATE baris persalinan
+      const { error: persError } = await supabase
+        .from("persalinan")
+        .update({
+          tempat: editTempat,
+          tempat_luar_nama: isTpmb ? null : editTempatLuarNama.trim(),
+          normal: isTpmb ? editNormal : false,
+          rujuk: editRujuk,
+          tujuan_rujuk: editRujuk ? (editTujuanRujuk.trim() || null) : null,
+          keterangan: editKeterangan.trim() || null,
+          delivery_datetime: deliveryIso,
+          diperbarui_oleh: staffName,
+          diperbarui_pada: nowIso,
+        })
+        .eq("id", editingPersalinan.id);
+
+      if (persError) {
+        throw new Error(`Gagal memperbarui data persalinan: ${persError.message}`);
+      }
+
+      // 2. Tangani bayi
+      if (!isTpmb) {
+        const { error: delAllErr } = await supabase
+          .from("persalinan_bayi")
+          .delete()
+          .eq("persalinan_id", editingPersalinan.id);
+
+        if (delAllErr) {
+          throw new Error(`Gagal membersihkan data bayi: ${delAllErr.message}`);
+        }
+      } else {
+        if (deletedBabyIds.length > 0) {
+          const { error: delErr } = await supabase
+            .from("persalinan_bayi")
+            .delete()
+            .in("id", deletedBabyIds);
+
+          if (delErr) {
+            throw new Error(`Gagal menghapus bayi: ${delErr.message}`);
+          }
+        }
+
+        for (const b of editBayiList) {
+          const bbl = b.bbl_gram ? parseFloat(b.bbl_gram) : null;
+          const pbl = b.pbl_cm ? parseFloat(b.pbl_cm) : null;
+          const lk = b.lk_cm ? parseFloat(b.lk_cm) : null;
+          const ld = b.ld_cm ? parseFloat(b.ld_cm) : null;
+
+          if (b.id) {
+            const { error: updBayiErr } = await supabase
+              .from("persalinan_bayi")
+              .update({
+                nama_bayi: b.nama_bayi.trim(),
+                jenis_kelamin: b.jenis_kelamin,
+                bbl_gram: bbl,
+                pbl_cm: pbl,
+                lk_cm: lk,
+                ld_cm: ld,
+                diperbarui_oleh: staffName,
+                diperbarui_pada: nowIso,
+              })
+              .eq("id", b.id);
+
+            if (updBayiErr) {
+              throw new Error(`Gagal memperbarui data bayi (${b.nama_bayi}): ${updBayiErr.message}`);
+            }
+          } else {
+            const { error: insBayiErr } = await supabase
+              .from("persalinan_bayi")
+              .insert({
+                persalinan_id: editingPersalinan.id,
+                nama_bayi: b.nama_bayi.trim(),
+                jenis_kelamin: b.jenis_kelamin,
+                bbl_gram: bbl,
+                pbl_cm: pbl,
+                lk_cm: lk,
+                ld_cm: ld,
+                spo2_tangan_kanan: b.spo2_tangan_kanan,
+                spo2_kaki: b.spo2_kaki,
+                skrining_shk: b.skrining_shk,
+                diperbarui_oleh: staffName,
+                diperbarui_pada: nowIso,
+              });
+
+            if (insBayiErr) {
+              throw new Error(`Gagal menambahkan bayi baru (${b.nama_bayi}): ${insBayiErr.message}`);
+            }
+          }
+        }
+      }
+
+      alert("Data persalinan berhasil diperbarui.");
+      setEditingPersalinan(null);
+      await fetchData();
+    } catch (err: any) {
+      console.error("Error saving edit persalinan:", err);
+      alert("Terjadi kesalahan: " + (err?.message || ""));
+    } finally {
+      setIsSavingPersalinan(false);
     }
   };
 
@@ -843,6 +1156,19 @@ export default function KehamilanPage() {
                               <Calendar size={12} /> Waktu Persalinan: {formattedDate}
                               {rec.staff_name && ` (Penolong/Bidan: ${rec.staff_name})`}
                             </p>
+                            {rec.diperbarui_oleh && (
+                              <p className="text-[11px] text-purple-700 italic mt-0.5">
+                                Terakhir diedit oleh: <strong>{rec.diperbarui_oleh}</strong>
+                                {rec.diperbarui_pada &&
+                                  ` (${new Date(rec.diperbarui_pada).toLocaleDateString("id-ID", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })} WIB)`}
+                              </p>
+                            )}
                             {rec.keterangan && (
                               <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded-lg mt-2 border border-gray-100">
                                 <em>Catatan:</em> {rec.keterangan}
@@ -850,7 +1176,7 @@ export default function KehamilanPage() {
                             )}
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap">
                             {momPhone && (
                               <a
                                 href={`https://wa.me/${momPhone}`}
@@ -861,6 +1187,14 @@ export default function KehamilanPage() {
                                 <MessageCircle size={13} /> WA
                               </a>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditPersalinan(rec)}
+                              className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold rounded-lg flex items-center gap-1 border border-purple-200 transition-colors"
+                              title="Edit data persalinan & bayi"
+                            >
+                              <Edit3 size={13} /> Edit Persalinan
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleDeletePersalinan(rec)}
@@ -1243,6 +1577,371 @@ export default function KehamilanPage() {
         </div>
       )}
 
+      {/* MODAL EDIT DATA PERSALINAN */}
+      {editingPersalinan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between bg-purple-50/50">
+              <div className="flex items-center gap-2">
+                <Building2 className="text-purple-600" size={20} />
+                <div>
+                  <h3 className="font-bold text-gray-800 text-base">Edit Data Persalinan</h3>
+                  <p className="text-xs text-gray-500">
+                    Ibu: <strong>{editingPersalinan.patients?.name}</strong> | Suami: {editingPersalinan.patients?.husband_name || "-"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isSavingPersalinan) setEditingPersalinan(null);
+                }}
+                disabled={isSavingPersalinan}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-5 text-sm">
+              
+              {/* Bagian 1: Tempat & Waktu Persalinan */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4">
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  1. Tempat & Waktu Persalinan
+                </h4>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                    Lokasi Persalinan <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleTempat("TPMB")}
+                      className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all ${
+                        editTempat === "TPMB"
+                          ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                          : "bg-white text-gray-700 border-gray-200 hover:bg-gray-100"
+                      }`}
+                    >
+                      Di TPMB Nina Rahayu
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleTempat("LUAR")}
+                      className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all ${
+                        editTempat === "LUAR"
+                          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                          : "bg-white text-gray-700 border-gray-200 hover:bg-gray-100"
+                      }`}
+                    >
+                      Di Luar TPMB (Faskes Rujukan)
+                    </button>
+                  </div>
+                </div>
+
+                {editTempat === "LUAR" && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Nama Faskes Luar <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: RSUD Kanjuruhan, RS Wava Husada"
+                      value={editTempatLuarNama}
+                      onChange={(e) => setEditTempatLuarNama(e.target.value)}
+                      className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Tanggal & Jam Persalinan (WIB) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={editDeliveryDateTime}
+                    onChange={(e) => setEditDeliveryDateTime(e.target.value)}
+                    className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    Waktu diinput sesuai jam lokal WIB (misal 10:00 WIB). Sistem otomatis menyinkronkan format database.
+                  </p>
+                </div>
+              </div>
+
+              {/* Bagian 2: Kondisi Klinis & Rujukan */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  2. Kondisi Klinis & Rujukan
+                </h4>
+
+                {editTempat === "TPMB" && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="edit-np"
+                      checked={editNormal}
+                      onChange={(e) => setEditNormal(e.target.checked)}
+                      className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                    />
+                    <label htmlFor="edit-np" className="text-xs font-medium text-gray-800">
+                      Persalinan Normal Pervaginam (NP)
+                    </label>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="edit-rujuk"
+                    checked={editRujuk}
+                    onChange={(e) => setEditRujuk(e.target.checked)}
+                    className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  />
+                  <label htmlFor="edit-rujuk" className="text-xs font-medium text-gray-800">
+                    Kasus Rujukan ke Fasilitas Lain
+                  </label>
+                </div>
+
+                {editRujuk && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Tujuan Rujukan
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: RSUD Kanjuruhan Kepanjen"
+                      value={editTujuanRujuk}
+                      onChange={(e) => setEditTujuanRujuk(e.target.value)}
+                      className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Keterangan Tambahan / Catatan Klinis (Opsional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Catatan kondisi ibu/bayi, indikasi rujukan, dll..."
+                    value={editKeterangan}
+                    onChange={(e) => setEditKeterangan(e.target.value)}
+                    className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Bagian 3: Data Bayi Baru Lahir (Hanya jika TPMB) */}
+              {editTempat === "TPMB" && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Baby size={15} className="text-purple-600" />
+                      3. Data Bayi Baru Lahir ({editBayiList.length} Bayi)
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={handleAddEditBayi}
+                      className="text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200 flex items-center gap-1 transition-colors"
+                    >
+                      <Plus size={13} /> Tambah Bayi (Kembar)
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {editBayiList.map((baby, idx) => {
+                      const bblNum = parseFloat(baby.bbl_gram);
+                      const isBblr = !isNaN(bblNum) && bblNum > 0 && bblNum < 2500;
+
+                      return (
+                        <div
+                          key={baby.tempId}
+                          className="bg-purple-50/50 p-4 rounded-xl border border-purple-100 space-y-3 relative"
+                        >
+                          <div className="flex items-center justify-between border-b border-purple-100 pb-2">
+                            <span className="font-bold text-xs text-purple-900">
+                              Bayi #{idx + 1}
+                            </span>
+                            {editBayiList.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEditBayi(idx)}
+                                className="text-red-500 hover:text-red-700 text-xs font-semibold flex items-center gap-1"
+                              >
+                                <Trash2 size={12} /> Hapus Kartu Ini
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                Nama Bayi <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Nama bayi..."
+                                value={baby.nama_bayi}
+                                onChange={(e) => handleUpdateBabyField(idx, "nama_bayi", e.target.value)}
+                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                Jenis Kelamin <span className="text-red-500">*</span>
+                              </label>
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateBabyField(idx, "jenis_kelamin", "L")}
+                                  className={`py-2 rounded-lg text-xs font-bold border transition-colors ${
+                                    baby.jenis_kelamin === "L"
+                                      ? "bg-blue-600 text-white border-blue-600"
+                                      : "bg-white text-gray-700 border-gray-200"
+                                  }`}
+                                >
+                                  Laki-laki (L)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateBabyField(idx, "jenis_kelamin", "P")}
+                                  className={`py-2 rounded-lg text-xs font-bold border transition-colors ${
+                                    baby.jenis_kelamin === "P"
+                                      ? "bg-pink-600 text-white border-pink-600"
+                                      : "bg-white text-gray-700 border-gray-200"
+                                  }`}
+                                >
+                                  Perempuan (P)
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Antropometri Bayi */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="block text-[11px] font-semibold text-gray-700">
+                                  BBL (gram) <span className="text-red-500">*</span>
+                                </label>
+                                {isBblr && (
+                                  <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1 rounded">
+                                    BBLR
+                                  </span>
+                                )}
+                              </div>
+                              <input
+                                type="number"
+                                placeholder="cth: 3100"
+                                value={baby.bbl_gram}
+                                onChange={(e) => handleUpdateBabyField(idx, "bbl_gram", e.target.value)}
+                                className={`w-full border rounded-lg p-2 text-sm focus:outline-none bg-white ${
+                                  isBblr ? "border-red-300 focus:ring-2 focus:ring-red-400" : "border-gray-200 focus:ring-2 focus:ring-purple-500"
+                                }`}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                PBL (cm)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.1"
+                                placeholder="cth: 49"
+                                value={baby.pbl_cm}
+                                onChange={(e) => handleUpdateBabyField(idx, "pbl_cm", e.target.value)}
+                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                LK (cm)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.1"
+                                placeholder="cth: 33"
+                                value={baby.lk_cm}
+                                onChange={(e) => handleUpdateBabyField(idx, "lk_cm", e.target.value)}
+                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                LD (cm)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.1"
+                                placeholder="cth: 32"
+                                value={baby.ld_cm}
+                                onChange={(e) => handleUpdateBabyField(idx, "ld_cm", e.target.value)}
+                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                              />
+                            </div>
+                          </div>
+
+                          <p className="text-[10px] text-gray-400 italic">
+                            * Catatan: Nilai skrining PJB & SHK bayi diatur secara terpisah melalui tombol Edit Skrining di kartu persalinan.
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Bagian 4: Audit Trail */}
+              <div className="bg-amber-50/60 p-4 rounded-xl border border-amber-200">
+                <label className="block text-xs font-semibold text-amber-950 mb-1 flex items-center gap-1.5">
+                  <UserCheck size={14} className="text-amber-700" />
+                  Nama Staff Pengubah <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ketik nama staff (wajib diisi, cth: Bidan Nina)"
+                  value={editStaffPengubah}
+                  onChange={(e) => setEditStaffPengubah(e.target.value)}
+                  className="w-full border border-amber-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+                />
+                <p className="text-[10px] text-amber-800 mt-1">
+                  Nama Anda akan dicatat pada riwayat audit sebagai penanggung jawab pengeditan data ini.
+                </p>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-gray-100 flex justify-end gap-2 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setEditingPersalinan(null)}
+                disabled={isSavingPersalinan}
+                className="px-4 py-2 border rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEditPersalinan}
+                disabled={isSavingPersalinan}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50 shadow-sm"
+              >
+                {isSavingPersalinan ? "Menyimpan..." : "Simpan Perubahan"}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
