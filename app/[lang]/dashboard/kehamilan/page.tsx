@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import AncHistoryModal from "./AncHistoryModal"; 
-import { hitungKehamilan, StatusKehamilan } from "@/lib/statusKehamilan";
+import { hitungKehamilan, StatusKehamilan, getTodayJakarta, parseDateOnly } from "@/lib/statusKehamilan";
 
 interface PregnantMom {
   id: string;
@@ -116,6 +116,24 @@ export default function KehamilanPage() {
   const [luarKet, setLuarKet] = useState("");
   const [isSavingLuar, setIsSavingLuar] = useState(false);
 
+  // Helper format tanggal Indonesia untuk HPHT lama
+  const formatHphtIndo = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return "-";
+    const parsed = parseDateOnly(dateStr);
+    if (!parsed || isNaN(parsed.getTime())) return dateStr;
+    return parsed.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
+  // State Modal Edit HPHT
+  const [isHphtModalOpen, setIsHphtModalOpen] = useState(false);
+  const [selectedMomForHpht, setSelectedMomForHpht] = useState<PregnantMom | null>(null);
+  const [newHpht, setNewHpht] = useState<string>("");
+  const [isSavingHpht, setIsSavingHpht] = useState<boolean>(false);
+
   // Helper konversi ISO ke datetime-local (WIB)
   const isoToDateTimeLocal = (isoStr: string | null | undefined): string => {
     if (!isoStr) return "";
@@ -200,6 +218,99 @@ export default function KehamilanPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Modal Edit HPHT Handlers
+  const handleOpenEditHpht = (mom: PregnantMom) => {
+    setSelectedMomForHpht(mom);
+    setNewHpht("");
+    setIsHphtModalOpen(true);
+  };
+
+  const handleCloseHphtModal = () => {
+    if (!isSavingHpht) {
+      setIsHphtModalOpen(false);
+      setSelectedMomForHpht(null);
+      setNewHpht("");
+    }
+  };
+
+  const handleSaveNewHpht = async () => {
+    if (!selectedMomForHpht) return;
+
+    if (!newHpht || !newHpht.trim()) {
+      alert("Tanggal HPHT baru wajib diisi. Bila ingin mengosongkan pantauan, silakan gunakan tombol 'Hapus HPHT'.");
+      return;
+    }
+
+    const parsedNew = parseDateOnly(newHpht);
+    if (!parsedNew || isNaN(parsedNew.getTime())) {
+      alert("Format tanggal HPHT tidak valid.");
+      return;
+    }
+
+    const todayJakarta = getTodayJakarta();
+    if (parsedNew.getTime() > todayJakarta.getTime()) {
+      alert("HPHT tidak boleh di masa depan");
+      return;
+    }
+
+    setIsSavingHpht(true);
+    try {
+      const { error } = await supabase
+        .from("patients")
+        .update({ hpht: newHpht })
+        .eq("id", selectedMomForHpht.id);
+
+      if (error) {
+        console.error("Gagal memperbarui HPHT:", error);
+        alert("Gagal memperbarui HPHT: " + error.message);
+        return;
+      }
+
+      setIsHphtModalOpen(false);
+      setSelectedMomForHpht(null);
+      setNewHpht("");
+      await fetchData();
+    } catch (err: any) {
+      console.error("Error:", err);
+      alert("Terjadi kesalahan: " + (err?.message || ""));
+    } finally {
+      setIsSavingHpht(false);
+    }
+  };
+
+  const handleDeleteHpht = async () => {
+    if (!selectedMomForHpht) return;
+
+    const ok = window.confirm(
+      "Menghapus HPHT akan mengeluarkan ibu ini dari pantauan kehamilan. Gunakan untuk data usang (ibu sudah tidak hamil dan tidak ada riwayat bersalin yang bisa dicatat). Ini BUKAN pencatatan persalinan."
+    );
+    if (!ok) return;
+
+    setIsSavingHpht(true);
+    try {
+      const { error } = await supabase
+        .from("patients")
+        .update({ hpht: null })
+        .eq("id", selectedMomForHpht.id);
+
+      if (error) {
+        console.error("Gagal menghapus HPHT:", error);
+        alert("Gagal menghapus HPHT: " + error.message);
+        return;
+      }
+
+      setIsHphtModalOpen(false);
+      setSelectedMomForHpht(null);
+      setNewHpht("");
+      await fetchData();
+    } catch (err: any) {
+      console.error("Error:", err);
+      alert("Terjadi kesalahan: " + (err?.message || ""));
+    } finally {
+      setIsSavingHpht(false);
+    }
+  };
 
   // Modal Bersalin Luar
   const handleOpenLuarModal = (mom: PregnantMom) => {
@@ -887,7 +998,7 @@ export default function KehamilanPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-1.5 relative z-10">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 relative z-10">
                         <a
                           href={`https://wa.me/${mom.phone}`}
                           target="_blank"
@@ -905,6 +1016,15 @@ export default function KehamilanPage() {
                           title="Lihat Riwayat ANC"
                         >
                           <FileText size={13} className="shrink-0" /> <span className="truncate">Riwayat</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditHpht(mom)}
+                          className="bg-amber-50 text-amber-700 border border-amber-200 py-2 px-1 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-amber-100 transition-colors text-center"
+                          title="Edit atau Koreksi HPHT"
+                        >
+                          <Calendar size={13} className="shrink-0" /> <span className="truncate">Edit HPHT</span>
                         </button>
 
                         <button
@@ -982,7 +1102,7 @@ export default function KehamilanPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-1.5">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                         <a
                           href={`https://wa.me/${mom.phone}`}
                           target="_blank"
@@ -1000,6 +1120,15 @@ export default function KehamilanPage() {
                           title="Lihat Riwayat ANC"
                         >
                           <FileText size={13} className="shrink-0" /> <span className="truncate">Riwayat</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditHpht(mom)}
+                          className="bg-amber-50 text-amber-700 border border-amber-200 py-2 px-1 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-amber-100 transition-colors text-center"
+                          title="Edit atau Hapus HPHT Pasien"
+                        >
+                          <Calendar size={13} className="shrink-0" /> <span className="truncate">Edit HPHT</span>
                         </button>
 
                         <button
@@ -1067,12 +1196,14 @@ export default function KehamilanPage() {
                       </div>
 
                       <div className="flex gap-2">
-                        <Link
-                          href={`/dashboard/pasien?search=${encodeURIComponent(mom.name)}`}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditHpht(mom)}
                           className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                          title="Koreksi HPHT di tempat"
                         >
-                          <Edit3 size={14} /> Koreksi Data Pasien
-                        </Link>
+                          <Calendar size={14} /> Edit HPHT
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleOpenHistory(mom)}
@@ -1939,6 +2070,99 @@ export default function KehamilanPage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDIT HPHT */}
+      {isHphtModalOpen && selectedMomForHpht && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="text-purple-600" size={20} />
+                <h3 className="font-bold text-gray-800">Edit HPHT Pasien</h3>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseHphtModal}
+                disabled={isSavingHpht}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="bg-purple-50 p-3.5 rounded-xl border border-purple-100 text-xs text-purple-900 space-y-1.5">
+              <p className="font-semibold text-sm text-purple-950">{selectedMomForHpht.name}</p>
+              <p className="text-purple-700">
+                Suami: {selectedMomForHpht.husband_name || "-"} | Alamat: {selectedMomForHpht.address}
+              </p>
+              <div className="pt-2 mt-1 border-t border-purple-200 flex justify-between items-center text-xs">
+                <span className="font-medium text-purple-900">HPHT Lama:</span>
+                <span className="font-bold text-purple-950 bg-white px-2.5 py-0.5 rounded border border-purple-200">
+                  {formatHphtIndo(selectedMomForHpht.hpht)}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  HPHT Baru <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={newHpht}
+                  onChange={(e) => setNewHpht(e.target.value)}
+                  disabled={isSavingHpht}
+                  className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                />
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Pilih tanggal HPHT yang benar (tidak boleh tanggal di masa depan).
+                </p>
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 space-y-1">
+                <p className="font-semibold flex items-center gap-1 text-amber-800">
+                  <AlertTriangle size={13} className="shrink-0" /> Panduan Penggunaan:
+                </p>
+                <p className="text-amber-800 leading-relaxed">
+                  Gunakan <strong>Simpan HPHT Baru</strong> untuk mengoreksi tanggal HPHT. Gunakan <strong>Hapus HPHT</strong> untuk data usang (ibu sudah tidak hamil dan tidak ada riwayat persalinan yang perlu dicatat).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-2 pt-3 border-t">
+              <button
+                type="button"
+                onClick={handleDeleteHpht}
+                disabled={isSavingHpht}
+                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                title="Hapus HPHT untuk data usang"
+              >
+                <Trash2 size={13} /> Hapus HPHT
+              </button>
+
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={handleCloseHphtModal}
+                  disabled={isSavingHpht}
+                  className="px-4 py-2 border rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveNewHpht}
+                  disabled={isSavingHpht}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 shadow-sm"
+                >
+                  {isSavingHpht ? "Menyimpan..." : "Simpan HPHT Baru"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
