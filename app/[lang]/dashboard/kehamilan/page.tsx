@@ -116,6 +116,15 @@ export default function KehamilanPage() {
   const [luarKet, setLuarKet] = useState("");
   const [isSavingLuar, setIsSavingLuar] = useState(false);
 
+  // Modal Tandai Bersalin di TPMB
+  const [isTpmbModalOpen, setIsTpmbModalOpen] = useState(false);
+  const [selectedMomForTpmb, setSelectedMomForTpmb] = useState<PregnantMom | null>(null);
+  const [tpmbDateTime, setTpmbDateTime] = useState<string>("");
+  const [tpmbNormal, setTpmbNormal] = useState<boolean>(true);
+  const [tpmbKet, setTpmbKet] = useState<string>("");
+  const [tpmbBayiList, setTpmbBayiList] = useState<EditBayiDraft[]>([]);
+  const [isSavingTpmb, setIsSavingTpmb] = useState(false);
+
   // Helper format tanggal Indonesia untuk HPHT lama
   const formatHphtIndo = (dateStr: string | null | undefined): string => {
     if (!dateStr) return "-";
@@ -309,6 +318,192 @@ export default function KehamilanPage() {
       alert("Terjadi kesalahan: " + (err?.message || ""));
     } finally {
       setIsSavingHpht(false);
+    }
+  };
+
+  // Modal Tandai Bersalin di TPMB Handlers
+  const handleOpenTpmbModal = (mom: PregnantMom) => {
+    setSelectedMomForTpmb(mom);
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const defaultLocal = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    setTpmbDateTime(defaultLocal);
+    setTpmbNormal(true);
+    setTpmbKet("");
+    setTpmbBayiList([]);
+    setIsTpmbModalOpen(true);
+  };
+
+  const handleAddTpmbBayi = () => {
+    setTpmbBayiList((prev) => [
+      ...prev,
+      {
+        tempId: `tpmb_bayi_${Date.now()}_${prev.length}`,
+        nama_bayi: `By. Ny. ${selectedMomForTpmb?.name || ""}`,
+        jenis_kelamin: "L",
+        bbl_gram: "",
+        pbl_cm: "",
+        lk_cm: "",
+        ld_cm: "",
+        spo2_tangan_kanan: null,
+        spo2_kaki: null,
+        skrining_shk: "Pending",
+      },
+    ]);
+  };
+
+  const handleDeleteTpmbBayi = (index: number) => {
+    setTpmbBayiList((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleUpdateTpmbBayiField = (
+    index: number,
+    field: keyof EditBayiDraft,
+    value: any
+  ) => {
+    setTpmbBayiList((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handleSaveTpmb = async () => {
+    if (!selectedMomForTpmb) return;
+
+    if (!tpmbDateTime) {
+      alert("Tanggal dan jam persalinan wajib diisi.");
+      return;
+    }
+
+    const deliveryDateObj = new Date(tpmbDateTime);
+    if (isNaN(deliveryDateObj.getTime())) {
+      alert("Format tanggal dan jam persalinan tidak valid.");
+      return;
+    }
+
+    // Validasi masa depan: bandingkan tanggal dalam zona Asia/Jakarta
+    const todayJakarta = getTodayJakarta();
+    const datePart = tpmbDateTime.slice(0, 10);
+    const parsedDate = parseDateOnly(datePart);
+    if (parsedDate && parsedDate.getTime() > todayJakarta.getTime()) {
+      alert("Tanggal persalinan tidak boleh di masa depan.");
+      return;
+    }
+
+    // Validasi kartu bayi bila ada (NOL kartu bayi diizinkan)
+    for (let i = 0; i < tpmbBayiList.length; i++) {
+      const b = tpmbBayiList[i];
+      if (!b.nama_bayi.trim()) {
+        alert(`Nama bayi ke-${i + 1} wajib diisi.`);
+        return;
+      }
+      if (!b.jenis_kelamin) {
+        alert(`Jenis kelamin bayi ke-${i + 1} wajib dipilih.`);
+        return;
+      }
+      if (!b.bbl_gram || isNaN(parseFloat(b.bbl_gram)) || parseFloat(b.bbl_gram) <= 0) {
+        alert(`Berat Badan Lahir (BBL) bayi ke-${i + 1} wajib diisi angka positif.`);
+        return;
+      }
+    }
+
+    const ok = window.confirm(
+      "Simpan persalinan akan menyelesaikan kehamilan ini — HPHT dihapus dari pantauan aktif, riwayat tersimpan. Lanjutkan?"
+    );
+    if (!ok) return;
+
+    setIsSavingTpmb(true);
+    try {
+      // Konversi waktu: input datetime-local WIB -> simpan UTC ISO
+      const deliveryIso = tpmbDateTime.includes("+") || tpmbDateTime.endsWith("Z")
+        ? new Date(tpmbDateTime).toISOString()
+        : new Date(`${tpmbDateTime.length === 16 ? tpmbDateTime + ":00" : tpmbDateTime}+07:00`).toISOString();
+
+      // 1. INSERT baris persalinan
+      const { data: newPersalinan, error: persError } = await supabase
+        .from("persalinan")
+        .insert({
+          patient_id: selectedMomForTpmb.id,
+          medical_record_id: null,
+          hpht_snapshot: selectedMomForTpmb.hpht || null,
+          delivery_datetime: deliveryIso,
+          tempat: "TPMB",
+          tempat_luar_nama: null,
+          normal: tpmbNormal,
+          rujuk: false,
+          tujuan_rujuk: null,
+          keterangan: tpmbKet.trim() || null,
+          staff_name: null,
+        })
+        .select()
+        .single();
+
+      if (persError || !newPersalinan) {
+        console.error("Gagal menyimpan persalinan TPMB:", persError);
+        alert("Gagal menyimpan persalinan: " + (persError?.message || ""));
+        setIsSavingTpmb(false);
+        return;
+      }
+
+      // 2. INSERT baris bayi jika ada
+      if (tpmbBayiList.length > 0) {
+        const bayiPayloads = tpmbBayiList.map((b) => {
+          const bblNum = b.bbl_gram ? parseFloat(b.bbl_gram) : null;
+          const pblNum = b.pbl_cm ? parseFloat(b.pbl_cm) : null;
+          const lkNum = b.lk_cm ? parseFloat(b.lk_cm) : null;
+          const ldNum = b.ld_cm ? parseFloat(b.ld_cm) : null;
+          const spo2TkNum = b.spo2_tangan_kanan != null && String(b.spo2_tangan_kanan).trim() !== "" ? Number(b.spo2_tangan_kanan) : null;
+          const spo2KNum = b.spo2_kaki != null && String(b.spo2_kaki).trim() !== "" ? Number(b.spo2_kaki) : null;
+          const shkVal = b.skrining_shk === "YA" || b.skrining_shk === "TIDAK" ? b.skrining_shk : null;
+
+          return {
+            persalinan_id: newPersalinan.id,
+            nama_bayi: b.nama_bayi.trim(),
+            jenis_kelamin: b.jenis_kelamin,
+            bbl_gram: bblNum,
+            pbl_cm: pblNum,
+            lk_cm: lkNum,
+            ld_cm: ldNum,
+            spo2_tangan_kanan: isNaN(spo2TkNum as number) ? null : spo2TkNum,
+            spo2_kaki: isNaN(spo2KNum as number) ? null : spo2KNum,
+            skrining_shk: shkVal,
+          };
+        });
+
+        const { error: bayiError } = await supabase
+          .from("persalinan_bayi")
+          .insert(bayiPayloads);
+
+        if (bayiError) {
+          console.error("Gagal menyimpan data bayi:", bayiError);
+          alert("Data persalinan tersimpan, namun gagal menyimpan data bayi: " + bayiError.message + ". HPHT tidak dihapus.");
+          setIsSavingTpmb(false);
+          return;
+        }
+      }
+
+      // 3. TERAKHIR: UPDATE patients.hpht = null
+      const { error: updateError } = await supabase
+        .from("patients")
+        .update({ hpht: null })
+        .eq("id", selectedMomForTpmb.id);
+
+      if (updateError) {
+        console.error("Gagal mengosongkan HPHT:", updateError);
+        alert("Persalinan tersimpan, namun gagal mengosongkan HPHT: " + updateError.message);
+      } else {
+        alert("Persalinan di TPMB berhasil dicatat. Kehamilan pasien telah diselesaikan.");
+      }
+
+      setIsTpmbModalOpen(false);
+      setSelectedMomForTpmb(null);
+      await fetchData();
+    } catch (err: any) {
+      console.error("Error:", err);
+      alert("Terjadi kesalahan: " + (err?.message || ""));
+    } finally {
+      setIsSavingTpmb(false);
     }
   };
 
@@ -1102,43 +1297,56 @@ export default function KehamilanPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                        <a
-                          href={`https://wa.me/${mom.phone}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="bg-green-50 text-green-700 py-2 px-1 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-green-100 transition-colors text-center"
-                          title="Hubungi via WhatsApp"
-                        >
-                          <MessageCircle size={13} className="shrink-0" /> <span className="truncate">Hubungi</span>
-                        </a>
+                      <div className="space-y-1.5">
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <a
+                            href={`https://wa.me/${mom.phone}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="bg-green-50 text-green-700 py-2 px-1 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-green-100 transition-colors text-center"
+                            title="Hubungi via WhatsApp"
+                          >
+                            <MessageCircle size={13} className="shrink-0" /> <span className="truncate">Hubungi</span>
+                          </a>
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenHistory(mom)}
-                          className="border border-gray-200 text-gray-600 py-2 px-1 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-gray-50 transition-colors text-center"
-                          title="Lihat Riwayat ANC"
-                        >
-                          <FileText size={13} className="shrink-0" /> <span className="truncate">Riwayat</span>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenHistory(mom)}
+                            className="border border-gray-200 text-gray-600 py-2 px-1 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-gray-50 transition-colors text-center"
+                            title="Lihat Riwayat ANC"
+                          >
+                            <FileText size={13} className="shrink-0" /> <span className="truncate">Riwayat</span>
+                          </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditHpht(mom)}
-                          className="bg-amber-50 text-amber-700 border border-amber-200 py-2 px-1 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-amber-100 transition-colors text-center"
-                          title="Edit atau Hapus HPHT Pasien"
-                        >
-                          <Calendar size={13} className="shrink-0" /> <span className="truncate">Edit HPHT</span>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditHpht(mom)}
+                            className="bg-amber-50 text-amber-700 border border-amber-200 py-2 px-1 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-amber-100 transition-colors text-center"
+                            title="Edit atau Hapus HPHT Pasien"
+                          >
+                            <Calendar size={13} className="shrink-0" /> <span className="truncate">Edit HPHT</span>
+                          </button>
+                        </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenLuarModal(mom)}
-                          className="bg-purple-600 text-white py-2 px-1 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-purple-700 transition-colors text-center shadow-sm"
-                          title="Tandai persalinan di luar"
-                        >
-                          <Building2 size={13} className="shrink-0" /> <span className="truncate">Bersalin Luar</span>
-                        </button>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenTpmbModal(mom)}
+                            className="bg-purple-600 text-white py-2 px-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-purple-700 transition-colors text-center shadow-sm"
+                            title="Tandai telah bersalin di TPMB Nina Rahayu"
+                          >
+                            <Baby size={13} className="shrink-0" /> <span className="truncate">Bersalin di TPMB</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenLuarModal(mom)}
+                            className="bg-purple-50 text-purple-700 border border-purple-200 py-2 px-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-purple-100 transition-colors text-center"
+                            title="Tandai persalinan di luar"
+                          >
+                            <Building2 size={13} className="shrink-0" /> <span className="truncate">Bersalin Luar</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1240,6 +1448,7 @@ export default function KehamilanPage() {
                     const formattedDate = isNaN(deliveryDate.getTime())
                       ? rec.delivery_datetime
                       : deliveryDate.toLocaleDateString("id-ID", {
+                          timeZone: "Asia/Jakarta",
                           day: "numeric",
                           month: "long",
                           year: "numeric",
@@ -1345,9 +1554,21 @@ export default function KehamilanPage() {
                           </h4>
 
                           {babies.length === 0 ? (
-                            <p className="text-xs text-gray-400 italic bg-gray-50 p-3 rounded-xl border border-gray-100">
-                              Tidak ada rincian data bayi dicatat (persalinan di faskes luar).
-                            </p>
+                            isTpbm ? (
+                              <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <span className="font-semibold flex items-center gap-1.5">
+                                  <AlertCircle size={15} className="text-amber-600 shrink-0" />
+                                  Data bayi belum dilengkapi
+                                </span>
+                                <span className="text-[11px] text-amber-700">
+                                  Lengkapi data bayi melalui tombol <strong>Edit Persalinan</strong> di atas.
+                                </span>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-gray-400 italic bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                Tidak ada rincian data bayi dicatat (persalinan di faskes luar).
+                              </p>
+                            )
                           ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               {babies.map((baby, idx) => {
@@ -2163,6 +2384,353 @@ export default function KehamilanPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL TANDAI BERSALIN DI TPMB */}
+      {isTpmbModalOpen && selectedMomForTpmb && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between bg-purple-50/50">
+              <div className="flex items-center gap-2">
+                <Baby className="text-purple-600" size={20} />
+                <div>
+                  <h3 className="font-bold text-gray-800 text-base">Tandai Bersalin di TPMB</h3>
+                  <p className="text-xs text-gray-500">
+                    Pencatatan persalinan di TPMB Nina Rahayu untuk menyelesaikan pantauan kehamilan.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isSavingTpmb) {
+                    setIsTpmbModalOpen(false);
+                    setSelectedMomForTpmb(null);
+                  }
+                }}
+                disabled={isSavingTpmb}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-5 text-sm">
+              {/* Ringkasan Ibu */}
+              <div className="bg-purple-50 p-3.5 rounded-xl border border-purple-100 text-xs text-purple-900 space-y-1">
+                <p className="font-semibold text-sm text-purple-950">{selectedMomForTpmb.name}</p>
+                <div className="flex justify-between">
+                  <span>HPHT: {selectedMomForTpmb.hpht || "-"}</span>
+                  <span>UK: {selectedMomForTpmb.ukWeeks} Mgu {selectedMomForTpmb.ukDays > 0 ? `${selectedMomForTpmb.ukDays} Hr` : ""}</span>
+                </div>
+                <p className="text-[11px] text-purple-700">
+                  Suami: {selectedMomForTpmb.husband_name || "-"} | HPL: {selectedMomForTpmb.hpl || "-"}
+                </p>
+              </div>
+
+              {/* Bagian 1: Waktu & Kondisi Persalinan */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Tanggal & Jam Persalinan (WIB) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={tpmbDateTime}
+                    onChange={(e) => setTpmbDateTime(e.target.value)}
+                    disabled={isSavingTpmb}
+                    className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    Dapat diisi tanggal lampau (misal: backfill persalinan Oktober 2026). Tanggal di masa depan tidak diperbolehkan.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="tpmb-normal"
+                    checked={tpmbNormal}
+                    onChange={(e) => setTpmbNormal(e.target.checked)}
+                    disabled={isSavingTpmb}
+                    className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  />
+                  <label htmlFor="tpmb-normal" className="text-xs font-semibold text-gray-800 cursor-pointer">
+                    Persalinan Normal Pervaginam (NP)
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Keterangan Tambahan / Catatan Klinis (Opsional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Catatan kondisi ibu/bayi, dll (bila ada)..."
+                    value={tpmbKet}
+                    onChange={(e) => setTpmbKet(e.target.value)}
+                    disabled={isSavingTpmb}
+                    className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Bagian 2: Data Bayi Baru Lahir (Opsional) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Baby size={15} className="text-purple-600" />
+                      Data Bayi Baru Lahir ({tpmbBayiList.length} Bayi)
+                    </h4>
+                    <p className="text-[11px] text-gray-500">
+                      Opsional: Tambahkan bayi sekarang, atau lengkapi nanti via Edit Persalinan.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddTpmbBayi}
+                    disabled={isSavingTpmb}
+                    className="text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-2.5 py-1.5 rounded-lg border border-purple-200 flex items-center gap-1 transition-colors"
+                  >
+                    <Plus size={13} /> {tpmbBayiList.length === 0 ? "Tambah Bayi" : "Tambah Bayi (Kembar)"}
+                  </button>
+                </div>
+
+                {tpmbBayiList.length === 0 ? (
+                  <div className="p-4 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-center text-xs text-gray-500">
+                    Belum ada data bayi ditambahkan. Bila data bayi belum tersedia saat ini, Anda dapat menyimpannya tanpa bayi dan melengkapinya nanti via tombol <strong>Edit Persalinan</strong> di kartu Sudah Bersalin.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {tpmbBayiList.map((baby, idx) => {
+                      const bblNum = parseFloat(baby.bbl_gram);
+                      const isBblr = !isNaN(bblNum) && bblNum > 0 && bblNum < 2500;
+
+                      return (
+                        <div
+                          key={baby.tempId}
+                          className="bg-purple-50/50 p-4 rounded-xl border border-purple-100 space-y-3 relative"
+                        >
+                          <div className="flex items-center justify-between border-b border-purple-100 pb-2">
+                            <span className="font-bold text-xs text-purple-900">
+                              Bayi #{idx + 1}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTpmbBayi(idx)}
+                              disabled={isSavingTpmb}
+                              className="text-red-500 hover:text-red-700 text-xs font-semibold flex items-center gap-1"
+                            >
+                              <Trash2 size={12} /> Hapus Kartu Ini
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                Nama Bayi <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Nama bayi..."
+                                value={baby.nama_bayi}
+                                onChange={(e) => handleUpdateTpmbBayiField(idx, "nama_bayi", e.target.value)}
+                                disabled={isSavingTpmb}
+                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                Jenis Kelamin <span className="text-red-500">*</span>
+                              </label>
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateTpmbBayiField(idx, "jenis_kelamin", "L")}
+                                  disabled={isSavingTpmb}
+                                  className={`py-2 rounded-lg text-xs font-bold border transition-colors ${
+                                    baby.jenis_kelamin === "L"
+                                      ? "bg-blue-600 text-white border-blue-600"
+                                      : "bg-white text-gray-700 border-gray-200"
+                                  }`}
+                                >
+                                  Laki-laki (L)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateTpmbBayiField(idx, "jenis_kelamin", "P")}
+                                  disabled={isSavingTpmb}
+                                  className={`py-2 rounded-lg text-xs font-bold border transition-colors ${
+                                    baby.jenis_kelamin === "P"
+                                      ? "bg-pink-600 text-white border-pink-600"
+                                      : "bg-white text-gray-700 border-gray-200"
+                                  }`}
+                                >
+                                  Perempuan (P)
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Antropometri Bayi */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="block text-[11px] font-semibold text-gray-700">
+                                  BBL (gram) <span className="text-red-500">*</span>
+                                </label>
+                                {isBblr && (
+                                  <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1 rounded">
+                                    BBLR
+                                  </span>
+                                )}
+                              </div>
+                              <input
+                                type="number"
+                                placeholder="cth: 3100"
+                                value={baby.bbl_gram}
+                                onChange={(e) => handleUpdateTpmbBayiField(idx, "bbl_gram", e.target.value)}
+                                disabled={isSavingTpmb}
+                                className={`w-full border rounded-lg p-2 text-sm focus:outline-none bg-white ${
+                                  isBblr ? "border-red-300 focus:ring-2 focus:ring-red-400" : "border-gray-200 focus:ring-2 focus:ring-purple-500"
+                                }`}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                PBL (cm)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.1"
+                                placeholder="cth: 49"
+                                value={baby.pbl_cm}
+                                onChange={(e) => handleUpdateTpmbBayiField(idx, "pbl_cm", e.target.value)}
+                                disabled={isSavingTpmb}
+                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                LK (cm)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.1"
+                                placeholder="cth: 33"
+                                value={baby.lk_cm}
+                                onChange={(e) => handleUpdateTpmbBayiField(idx, "lk_cm", e.target.value)}
+                                disabled={isSavingTpmb}
+                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                LD (cm)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.1"
+                                placeholder="cth: 32"
+                                value={baby.ld_cm}
+                                onChange={(e) => handleUpdateTpmbBayiField(idx, "ld_cm", e.target.value)}
+                                disabled={isSavingTpmb}
+                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Skrining PJB & SHK */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                SpO2 Tangan Kanan (%)
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                placeholder="cth: 98"
+                                value={baby.spo2_tangan_kanan ?? ""}
+                                onChange={(e) => handleUpdateTpmbBayiField(idx, "spo2_tangan_kanan", e.target.value === "" ? null : Number(e.target.value))}
+                                disabled={isSavingTpmb}
+                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                SpO2 Kaki (%)
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                placeholder="cth: 97"
+                                value={baby.spo2_kaki ?? ""}
+                                onChange={(e) => handleUpdateTpmbBayiField(idx, "spo2_kaki", e.target.value === "" ? null : Number(e.target.value))}
+                                disabled={isSavingTpmb}
+                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                Skrining SHK
+                              </label>
+                              <select
+                                value={baby.skrining_shk || "Pending"}
+                                onChange={(e) => handleUpdateTpmbBayiField(idx, "skrining_shk", e.target.value)}
+                                disabled={isSavingTpmb}
+                                className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                              >
+                                <option value="Pending">Pending (Puskesmas)</option>
+                                <option value="YA">Dilakukan (YA)</option>
+                                <option value="TIDAK">Tidak Dilakukan (TIDAK)</option>
+                              </select>
+                            </div>
+                          </div>
+
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <p className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                ⚠️ <strong>Perhatian:</strong> Menyimpan persalinan ini akan menghapus HPHT aktif pasien sehingga kartu kehamilan berpindah ke tab Sudah Bersalin. Riwayat persalinan tercatat sebagai persalinan di TPMB Nina Rahayu dan akan masuk laporan bulanan.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 sm:p-5 border-t border-gray-100 flex justify-end gap-2 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsTpmbModalOpen(false);
+                  setSelectedMomForTpmb(null);
+                }}
+                disabled={isSavingTpmb}
+                className="px-4 py-2 border rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveTpmb}
+                disabled={isSavingTpmb}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50 shadow-sm"
+              >
+                {isSavingTpmb ? "Menyimpan..." : "Simpan Persalinan TPMB"}
+              </button>
+            </div>
+
           </div>
         </div>
       )}
