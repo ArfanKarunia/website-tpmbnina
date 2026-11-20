@@ -25,6 +25,7 @@ interface Transaction {
   amount: number;
   quantity: number;
   type: 'in' | 'out';
+  payment_method?: string | null;
 }
 
 export default function KeuanganPage() {
@@ -51,11 +52,21 @@ export default function KeuanganPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false); 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState("All");
   const [startDate, setStartDate] = useState(firstDay); 
   const [endDate, setEndDate] = useState(today); 
 
-  // STATS STATE
-  const [stats, setStats] = useState({ income: 0, expense: 0, net: 0 });
+  // STATS STATE (Pemisahan Tunai & Non-Tunai)
+  const [stats, setStats] = useState({
+    income: 0,
+    incomeTunai: 0,
+    incomeNonTunai: 0,
+    incomeQris: 0,
+    incomeBpjs: 0,
+    incomeBkkbn: 0,
+    expense: 0,
+    net: 0,
+  });
 
   // FINANCIAL SPLITS STATE
   const [splits, setSplits] = useState<FinancialSplit[]>([]);
@@ -141,6 +152,22 @@ export default function KeuanganPage() {
     fetchSplits();
   }, [startDate, endDate]);
 
+  // Helper penentuan metode pembayaran (prioritas payment_method, fallback tag deskripsi, default CASH)
+  const getTransactionMethod = (trx: Transaction): "CASH" | "QRIS" | "BPJS" | "BKKBN" => {
+    if (trx.payment_method) {
+      const pm = trx.payment_method.toUpperCase();
+      if (pm === "QRIS") return "QRIS";
+      if (pm === "BPJS") return "BPJS";
+      if (pm === "BKKBN") return "BKKBN";
+      return "CASH";
+    }
+    const desc = trx.description || "";
+    if (desc.includes("[QRIS]")) return "QRIS";
+    if (desc.includes("[BPJS]")) return "BPJS";
+    if (desc.includes("[BKKBN]")) return "BKKBN";
+    return "CASH";
+  };
+
   const filteredTransactions = useMemo(() => {
     let result = transactions;
     
@@ -154,23 +181,60 @@ export default function KeuanganPage() {
     return result.filter((t) => {
       const matchSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
       const matchCategory = filterCategory === "All" || t.category === filterCategory;
-      return matchSearch && matchCategory;
+      
+      // Filter Metode Pembayaran (HANYA aktif untuk role owner)
+      let matchMethod = true;
+      if (userRole === 'owner' && filterPaymentMethod !== "All") {
+        const method = getTransactionMethod(t);
+        if (filterPaymentMethod === "Tunai" || filterPaymentMethod === "CASH") {
+          matchMethod = method === "CASH";
+        } else {
+          matchMethod = method === filterPaymentMethod;
+        }
+      }
+
+      return matchSearch && matchCategory && matchMethod;
     });
-  }, [transactions, searchTerm, filterCategory, userRole]);
+  }, [transactions, searchTerm, filterCategory, filterPaymentMethod, userRole]);
 
   useEffect(() => {
     let totalIncome = 0;
+    let incomeTunai = 0;
+    let incomeQris = 0;
+    let incomeBpjs = 0;
+    let incomeBkkbn = 0;
     let totalExpense = 0;
 
     filteredTransactions.forEach((t) => {
-      if (t.type === 'in') totalIncome += Number(t.amount);
-      else totalExpense += Number(t.amount);
+      const amt = Number(t.amount) || 0;
+      if (t.type === 'in') {
+        totalIncome += amt;
+        const method = getTransactionMethod(t);
+        if (method === 'CASH') {
+          incomeTunai += amt;
+        } else if (method === 'QRIS') {
+          incomeQris += amt;
+        } else if (method === 'BPJS') {
+          incomeBpjs += amt;
+        } else if (method === 'BKKBN') {
+          incomeBkkbn += amt;
+        }
+      } else {
+        totalExpense += amt;
+      }
     });
+
+    const incomeNonTunai = incomeQris + incomeBpjs + incomeBkkbn;
 
     setStats({
       income: totalIncome,
+      incomeTunai,
+      incomeNonTunai,
+      incomeQris,
+      incomeBpjs,
+      incomeBkkbn,
       expense: totalExpense,
-      net: totalIncome - totalExpense
+      net: totalIncome - totalExpense,
     });
   }, [filteredTransactions]);
 
@@ -263,8 +327,8 @@ export default function KeuanganPage() {
       {/* FILTER PANEL */}
       {isFilterOpen && (
         <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm animate-in fade-in slide-in-from-top-2">
-           <div className="flex flex-col md:flex-row gap-4 items-end">
-              <div className="w-full md:w-1/3">
+           <div className="flex flex-col md:flex-row gap-4 items-end flex-wrap">
+              <div className="w-full md:flex-1 min-w-[180px]">
                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Cari Transaksi</label>
                  <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -272,7 +336,7 @@ export default function KeuanganPage() {
                  </div>
               </div>
               
-              <div className="w-full md:w-1/3 flex gap-2">
+              <div className="w-full md:flex-1 min-w-[220px] flex gap-2">
                  <div className="w-1/2">
                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Dari Tanggal</label>
                    <input type="date" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-700" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
@@ -283,7 +347,7 @@ export default function KeuanganPage() {
                  </div>
               </div>
 
-              <div className="w-full md:w-1/3">
+              <div className="w-full md:flex-1 min-w-[160px]">
                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Kategori</label>
                  <select className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
                     <option value="All">Semua Kategori</option>
@@ -294,7 +358,26 @@ export default function KeuanganPage() {
                     <option value="Maintenance">Maintenance</option>
                  </select>
               </div>
-              <button onClick={() => { setSearchTerm(""); setFilterCategory("All"); setStartDate(firstDay); setEndDate(today); }} className="w-full md:w-auto px-4 py-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors text-sm font-medium">Reset</button>
+
+              {/* Filter Metode Pembayaran (HANYA tampil untuk role owner) */}
+              {userRole === "owner" && (
+                <div className="w-full md:flex-1 min-w-[150px]">
+                   <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Metode Pembayaran</label>
+                   <select 
+                     className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium" 
+                     value={filterPaymentMethod} 
+                     onChange={(e) => setFilterPaymentMethod(e.target.value)}
+                   >
+                      <option value="All">Semua</option>
+                      <option value="Tunai">Tunai</option>
+                      <option value="QRIS">QRIS</option>
+                      <option value="BPJS">BPJS</option>
+                      <option value="BKKBN">BKKBN</option>
+                   </select>
+                </div>
+              )}
+
+              <button onClick={() => { setSearchTerm(""); setFilterCategory("All"); setFilterPaymentMethod("All"); setStartDate(firstDay); setEndDate(today); }} className="w-full md:w-auto px-4 py-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors text-sm font-medium">Reset</button>
            </div>
         </div>
       )}
@@ -305,8 +388,39 @@ export default function KeuanganPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
             <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden group">
               <div className="relative z-10">
-                <p className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Pemasukan (Terfilter)</p>
+                <p className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total Pemasukan (Terfilter)</p>
                 <h3 className="text-xl md:text-2xl font-bold text-green-600">{isLoading ? "..." : formatRupiah(stats.income)}</h3>
+
+                <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5 text-xs">
+                  <div className="flex justify-between items-center text-gray-700">
+                    <span className="font-medium flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                      Tunai:
+                    </span>
+                    <span className="font-bold text-gray-900">{isLoading ? "..." : formatRupiah(stats.incomeTunai)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-gray-700">
+                    <span className="font-medium flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
+                      Non-Tunai:
+                    </span>
+                    <span className="font-bold text-gray-900">{isLoading ? "..." : formatRupiah(stats.incomeNonTunai)}</span>
+                  </div>
+                  <div className="pl-3.5 space-y-0.5 text-[11px] text-gray-500">
+                    <div className="flex justify-between">
+                      <span>• QRIS:</span>
+                      <span className="font-semibold text-gray-700">{isLoading ? "..." : formatRupiah(stats.incomeQris)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>• BPJS:</span>
+                      <span className="font-semibold text-gray-700">{isLoading ? "..." : formatRupiah(stats.incomeBpjs)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>• BKKBN:</span>
+                      <span className="font-semibold text-gray-700">{isLoading ? "..." : formatRupiah(stats.incomeBkkbn)}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="absolute right-4 top-4 text-green-50 opacity-50 group-hover:scale-110 transition-transform"><Wallet size={60} className="md:w-20 md:h-20" /></div>
             </div>
@@ -382,12 +496,13 @@ export default function KeuanganPage() {
       {/* TABEL RESPONSIVE */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden w-full min-w-0">
         <div className="overflow-x-auto w-full">
-          <table className="w-full text-sm text-left min-w-[700px]">
+          <table className="w-full text-sm text-left min-w-[780px]">
             <thead className="bg-gray-50 text-gray-500 font-medium">
               <tr className="text-xs uppercase tracking-wider">
                 <th className="px-4 py-4 md:px-6">Tanggal</th>
                 <th className="px-4 py-4 md:px-6">Keterangan</th>
                 <th className="px-4 py-4 md:px-6">Kategori</th>
+                <th className="px-4 py-4 md:px-6 text-center">Metode</th>
                 <th className="px-4 py-4 md:px-6 text-right">Jumlah</th>
                 <th className="px-4 py-4 md:px-6 text-center">Status</th>
                 <th className="px-4 py-4 md:px-6 text-center">Aksi</th>
@@ -395,44 +510,56 @@ export default function KeuanganPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
-                 <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400">Memuat data...</td></tr>
+                 <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-400">Memuat data...</td></tr>
               ) : filteredTransactions.length > 0 ? (
-                filteredTransactions.map((trx) => (
-                  <tr key={trx.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-4 py-3 md:px-6 md:py-4 text-gray-500 w-28 md:w-32 whitespace-nowrap text-xs md:text-sm">
-                      {new Date(trx.date).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="px-4 py-3 md:px-6 md:py-4">
-                      <div className="font-bold text-gray-800 text-xs md:text-sm">{trx.description}</div>
-                      {trx.quantity > 1 && (
-                         <div className="flex items-center gap-1 mt-1 text-[10px] md:text-xs text-blue-600 bg-blue-50 w-fit px-2 py-0.5 rounded-md font-medium">
-                            <Box size={10} className="md:w-3 md:h-3" /> {trx.quantity} Item x @{formatRupiah(trx.amount / trx.quantity)}
+                filteredTransactions.map((trx) => {
+                  const method = getTransactionMethod(trx);
+                  return (
+                    <tr key={trx.id} className="hover:bg-gray-50 transition-colors group">
+                      <td className="px-4 py-3 md:px-6 md:py-4 text-gray-500 w-28 md:w-32 whitespace-nowrap text-xs md:text-sm">
+                        {new Date(trx.date).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4">
+                        <div className="font-bold text-gray-800 text-xs md:text-sm">{trx.description}</div>
+                        {trx.quantity > 1 && (
+                           <div className="flex items-center gap-1 mt-1 text-[10px] md:text-xs text-blue-600 bg-blue-50 w-fit px-2 py-0.5 rounded-md font-medium">
+                              <Box size={10} className="md:w-3 md:h-3" /> {trx.quantity} Item x @{formatRupiah(trx.amount / trx.quantity)}
+                           </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4">
+                        <span className={`px-2 py-1 md:px-3 rounded-full text-[9px] md:text-xs font-bold whitespace-nowrap 
+                          ${trx.category === 'Obat & Vitamin' ? 'bg-purple-100 text-purple-700' : 
+                            trx.category === 'Layanan Medis' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {trx.category}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 text-center">
+                        <span className={`px-2.5 py-1 rounded-full text-[9px] md:text-xs font-bold whitespace-nowrap inline-block
+                          ${method === 'QRIS' ? 'bg-blue-100 text-blue-700' : 
+                            method === 'BPJS' ? 'bg-teal-100 text-teal-700' : 
+                            method === 'BKKBN' ? 'bg-amber-100 text-amber-700' : 
+                            'bg-emerald-100 text-emerald-700'}`}>
+                          {method === 'CASH' ? 'Tunai' : method}
+                        </span>
+                      </td>
+                      <td className={`px-4 py-3 md:px-6 md:py-4 text-right font-black whitespace-nowrap text-xs md:text-sm ${trx.type === 'in' ? 'text-green-600' : 'text-red-500'}`}>
+                        {trx.type === 'in' ? '+' : '-'} {formatRupiah(trx.amount)}
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 text-center">
+                        <span className="text-green-600 text-[10px] md:text-xs font-bold bg-green-50 px-2 py-1 rounded-md">Lunas</span>
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 text-center">
+                         <div className="flex items-center justify-center gap-1.5 md:gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => handleEdit(trx)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil size={14} className="md:w-4 md:h-4" /></button>
+                            <button onClick={() => handleDeleteClick(trx.id, trx.description)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} className="md:w-4 md:h-4" /></button>
                          </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 md:px-6 md:py-4">
-                      <span className={`px-2 py-1 md:px-3 rounded-full text-[9px] md:text-xs font-bold whitespace-nowrap 
-                        ${trx.category === 'Obat & Vitamin' ? 'bg-purple-100 text-purple-700' : 
-                          trx.category === 'Layanan Medis' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-                        {trx.category}
-                      </span>
-                    </td>
-                    <td className={`px-4 py-3 md:px-6 md:py-4 text-right font-black whitespace-nowrap text-xs md:text-sm ${trx.type === 'in' ? 'text-green-600' : 'text-red-500'}`}>
-                      {trx.type === 'in' ? '+' : '-'} {formatRupiah(trx.amount)}
-                    </td>
-                    <td className="px-4 py-3 md:px-6 md:py-4 text-center">
-                      <span className="text-green-600 text-[10px] md:text-xs font-bold bg-green-50 px-2 py-1 rounded-md">Lunas</span>
-                    </td>
-                    <td className="px-4 py-3 md:px-6 md:py-4 text-center">
-                       <div className="flex items-center justify-center gap-1.5 md:gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleEdit(trx)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil size={14} className="md:w-4 md:h-4" /></button>
-                          <button onClick={() => handleDeleteClick(trx.id, trx.description)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} className="md:w-4 md:h-4" /></button>
-                       </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic">Data tidak ditemukan sesuai filter rentang tanggal.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400 italic">Data tidak ditemukan sesuai filter rentang tanggal.</td></tr>
               )}
             </tbody>
           </table>
