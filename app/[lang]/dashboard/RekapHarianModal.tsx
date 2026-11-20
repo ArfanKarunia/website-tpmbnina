@@ -9,7 +9,24 @@ interface Transaction {
   amount: number;
   quantity: number;
   type: 'in' | 'out';
+  payment_method?: string | null;
 }
+
+// Helper penentuan metode pembayaran (prioritas payment_method, fallback tag deskripsi, default CASH)
+const getTransactionMethod = (trx: Transaction): "CASH" | "QRIS" | "BPJS" | "BKKBN" => {
+  if (trx.payment_method) {
+    const pm = trx.payment_method.toUpperCase();
+    if (pm === "QRIS") return "QRIS";
+    if (pm === "BPJS") return "BPJS";
+    if (pm === "BKKBN") return "BKKBN";
+    return "CASH";
+  }
+  const desc = trx.description || "";
+  if (desc.includes("[QRIS]")) return "QRIS";
+  if (desc.includes("[BPJS]")) return "BPJS";
+  if (desc.includes("[BKKBN]")) return "BKKBN";
+  return "CASH";
+};
 
 interface RekapHarianModalProps {
   isOpen: boolean;
@@ -36,7 +53,11 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
     const uniqueUmum = new Set();
     const uniqueKiaBpjs = new Set();
     const uniqueKiaNonBpjs = new Set();
-    let income = 0;
+    let totalIncome = 0;
+    let incomeTunai = 0;
+    let incomeQris = 0;
+    let incomeBpjs = 0;
+    let incomeBkkbn = 0;
     let totalExp = 0;
     const expCategories: Record<string, number> = {};
 
@@ -50,11 +71,21 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
         else if (t.description.includes('(KIA - Non BPJS)')) uniqueKiaNonBpjs.add(patientName);
       }
 
-      // 2. LOGIKA HITUNG UANG (Pisahkan in dan out seperti sebelumnya)
+      // 2. LOGIKA HITUNG UANG (Pisahkan Tunai dan Non-Tunai)
+      const amount = Number(t.amount) || 0;
       if (t.type === 'in') {
-        income += Number(t.amount);
+        totalIncome += amount;
+        const method = getTransactionMethod(t);
+        if (method === 'CASH') {
+          incomeTunai += amount;
+        } else if (method === 'QRIS') {
+          incomeQris += amount;
+        } else if (method === 'BPJS') {
+          incomeBpjs += amount;
+        } else if (method === 'BKKBN') {
+          incomeBkkbn += amount;
+        }
       } else {
-        const amount = Number(t.amount);
         totalExp += amount;
         if (expCategories[t.category]) {
           expCategories[t.category] += amount;
@@ -64,16 +95,25 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
       }
     });
 
+    const incomeNonTunai = incomeQris + incomeBpjs + incomeBkkbn;
+    const netTunai = incomeTunai - totalExp;
+
     return {
       dailyData,
       countUmum: uniqueUmum.size, 
       countKiaBpjs: uniqueKiaBpjs.size, 
       countKiaNonBpjs: uniqueKiaNonBpjs.size,
       totalPasien: uniqueUmum.size + uniqueKiaBpjs.size + uniqueKiaNonBpjs.size,
-      income,
+      income: totalIncome,
+      incomeTunai,
+      incomeNonTunai,
+      incomeQris,
+      incomeBpjs,
+      incomeBkkbn,
       expCategories,
       totalExp,
-      net: income - totalExp
+      net: netTunai,
+      netTunai
     };
   }, [transactions, rekapDate, userRole]);
 
@@ -94,6 +134,11 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
         [""],
         ["--- RINGKASAN KEUANGAN ---"],
         ["Keterangan", "Nominal (Rp)"],
+        ["Pemasukan Tunai", dailyRecap.incomeTunai],
+        ["Pemasukan Non-Tunai - QRIS", dailyRecap.incomeQris],
+        ["Pemasukan Non-Tunai - BPJS", dailyRecap.incomeBpjs],
+        ["Pemasukan Non-Tunai - BKKBN", dailyRecap.incomeBkkbn],
+        ["Total Pemasukan Non-Tunai", dailyRecap.incomeNonTunai],
         ["Total Pemasukan", dailyRecap.income],
       ];
 
@@ -103,15 +148,16 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
 
       wsData.push(
         ["Total Pengeluaran", dailyRecap.totalExp],
-        ["SALDO BERSIH HARI INI", dailyRecap.net],
+        ["SALDO BERSIH (TUNAI)", dailyRecap.netTunai],
         [""],
         ["--- RINCIAN TRANSAKSI HARI INI ---"],
-        ["Tipe", "Kategori", "Keterangan", "Jumlah (Rp)"]
+        ["Tipe", "Metode", "Kategori", "Keterangan", "Jumlah (Rp)"]
       );
 
       dailyRecap.dailyData.forEach(t => {
         wsData.push([
           t.type === 'in' ? 'Pemasukan' : 'Pengeluaran',
+          getTransactionMethod(t),
           t.category,
           t.description,
           t.amount
@@ -119,7 +165,7 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
       });
 
       const ws = XLSX.utils.aoa_to_sheet(wsData);
-      ws['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 40 }, { wch: 15 }];
+      ws['!cols'] = [{ wch: 35 }, { wch: 15 }, { wch: 20 }, { wch: 45 }, { wch: 18 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Rekap_Harian");
       XLSX.writeFile(wb, `Rekap_Harian_${rekapDate}.xlsx`);
@@ -168,8 +214,42 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
                {/* BAGIAN KEUANGAN */}
                <div className="border border-gray-100 rounded-2xl p-3 md:p-4 bg-gray-50/50">
                   <h4 className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 md:mb-3 flex items-center gap-2"><Wallet size={12} className="md:w-3 md:h-3"/> Arus Kas Harian</h4>
-                  <div className="flex justify-between text-xs md:text-sm mb-3"><span className="text-gray-600">Pemasukan</span><span className="font-bold text-green-600">{formatRupiah(dailyRecap.income)}</span></div>
                   
+                  {/* Pemasukan Tunai */}
+                  <div className="flex justify-between text-xs md:text-sm mb-2">
+                    <span className="text-gray-700 font-medium">Pemasukan Tunai</span>
+                    <span className="font-bold text-green-600">{formatRupiah(dailyRecap.incomeTunai)}</span>
+                  </div>
+
+                  {/* Pemasukan Non-Tunai */}
+                  <div className="flex justify-between text-xs md:text-sm mb-1">
+                    <span className="text-gray-600">Pemasukan Non-Tunai <span className="text-[10px] text-gray-400 italic">(masuk rekening)</span></span>
+                    <span className="font-semibold text-blue-600">{formatRupiah(dailyRecap.incomeNonTunai)}</span>
+                  </div>
+
+                  {/* Rincian Non-Tunai per metode */}
+                  <div className="pl-2 md:pl-3 border-l-2 border-blue-200 mb-2 space-y-1">
+                    <div className="flex justify-between text-[10px] md:text-xs text-gray-500">
+                      <span>• QRIS (masuk rekening)</span>
+                      <span className="font-medium text-gray-700">{formatRupiah(dailyRecap.incomeQris)}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] md:text-xs text-gray-500">
+                      <span>• BPJS (masuk rekening)</span>
+                      <span className="font-medium text-gray-700">{formatRupiah(dailyRecap.incomeBpjs)}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] md:text-xs text-gray-500">
+                      <span>• BKKBN (masuk rekening)</span>
+                      <span className="font-medium text-gray-700">{formatRupiah(dailyRecap.incomeBkkbn)}</span>
+                    </div>
+                  </div>
+
+                  {/* Info Total Pemasukan */}
+                  <div className="flex justify-between text-xs md:text-sm py-1.5 border-t border-b border-gray-200/70 mb-3 bg-gray-100/50 -mx-1 px-2 rounded-lg">
+                    <span className="text-gray-600 font-medium">Total Pemasukan (Tunai + Non-Tunai)</span>
+                    <span className="font-bold text-gray-800">{formatRupiah(dailyRecap.income)}</span>
+                  </div>
+                  
+                  {/* Pengeluaran per kategori */}
                   {Object.keys(dailyRecap.expCategories).length > 0 && (
                     <div className="pl-2 md:pl-3 border-l-2 border-red-200 mb-3 space-y-1.5 md:space-y-2">
                       {Object.entries(dailyRecap.expCategories).map(([cat, val]) => (
@@ -181,11 +261,19 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
                     </div>
                   )}
                   
-                  <div className="flex justify-between text-xs md:text-sm mb-3"><span className="text-gray-600">Total Pengeluaran</span><span className="font-bold text-red-600">{formatRupiah(dailyRecap.totalExp)}</span></div>
+                  {/* Total Pengeluaran */}
+                  <div className="flex justify-between text-xs md:text-sm mb-3">
+                    <span className="text-gray-600">Total Pengeluaran</span>
+                    <span className="font-bold text-red-600">{formatRupiah(dailyRecap.totalExp)}</span>
+                  </div>
                   
+                  {/* Saldo Bersih Tunai (Tutup Kasir) */}
                   <div className="pt-2 md:pt-3 border-t border-dashed border-gray-300 flex justify-between items-center mt-2">
-                     <span className="font-black text-gray-800 text-xs md:text-sm">SALDO BERSIH</span>
-                     <span className="font-black text-xl md:text-2xl text-blue-600">{formatRupiah(dailyRecap.net)}</span>
+                     <div>
+                       <span className="font-black text-gray-800 text-xs md:text-sm block">SALDO BERSIH (TUNAI)</span>
+                       <span className="text-[10px] text-gray-400 block">Tutup Kasir = Tunai - Pengeluaran</span>
+                     </div>
+                     <span className="font-black text-xl md:text-2xl text-blue-600">{formatRupiah(dailyRecap.netTunai)}</span>
                   </div>
                </div>
             </div>
