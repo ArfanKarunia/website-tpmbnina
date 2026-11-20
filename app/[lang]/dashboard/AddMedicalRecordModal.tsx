@@ -978,12 +978,7 @@ export default function AddMedicalRecordModal({
       // 2. Transaksi & Resep Obat (seperti biasa)
       // ----------------------------------------------------------------------
       const transactionsPayload = [];
-      const txType =
-        paymentMethod === "QRIS" ||
-        paymentMethod === "BPJS" ||
-        paymentMethod === "BKKBN"
-          ? "out"
-          : "in";
+      const txType = "in";
       const noteSuffix = paymentNote ? ` - ${paymentNote}` : "";
 
       transactionsPayload.push({
@@ -991,6 +986,7 @@ export default function AddMedicalRecordModal({
         description: `Jasa: ${selectedPatient?.name} (${visitCategory}) [${paymentMethod}]${noteSuffix}`,
         category: "Layanan Medis",
         type: txType,
+        payment_method: paymentMethod,
         amount: formData.service_fee || 0,
         quantity: 1,
         visit_id: recordId,
@@ -1002,6 +998,7 @@ export default function AddMedicalRecordModal({
           description: `Obat: ${selectedPatient?.name} (${visitCategory}) [${paymentMethod}]${noteSuffix}`,
           category: "Obat & Vitamin",
           type: txType,
+          payment_method: paymentMethod,
           amount: medicineTotal,
           quantity: 1,
           visit_id: recordId,

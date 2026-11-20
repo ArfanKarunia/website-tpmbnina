@@ -15,6 +15,7 @@ interface Transaction {
   amount: number;
   quantity: number;
   type: 'in' | 'out';
+  payment_method?: string | null;
 }
 
 // Interface Obat & Cart
@@ -59,6 +60,7 @@ export default function AddTransactionModal({ isOpen, onClose, transactionToEdit
     date: new Date().toISOString().split('T')[0],
     price: "", 
     qty: 1,    
+    payment_method: "CASH",
   });
 
   const [totalAmount, setTotalAmount] = useState(0);
@@ -91,7 +93,8 @@ export default function AddTransactionModal({ isOpen, onClose, transactionToEdit
           type: transactionToEdit.type,
           date: transactionToEdit.date,
           price: pricePerItem.toString(),
-          qty: transactionToEdit.quantity
+          qty: transactionToEdit.quantity,
+          payment_method: transactionToEdit.payment_method || "CASH",
         });
         setTotalAmount(transactionToEdit.amount); 
         
@@ -108,7 +111,8 @@ export default function AddTransactionModal({ isOpen, onClose, transactionToEdit
           type: "in",
           date: new Date().toISOString().split('T')[0],
           price: "",
-          qty: 1
+          qty: 1,
+          payment_method: "CASH",
         });
         setTotalAmount(0);
         setSelectedMedicineId("");
@@ -196,6 +200,7 @@ export default function AddTransactionModal({ isOpen, onClose, transactionToEdit
           description: formData.category === "Obat & Vitamin" ? (medicineList.find(m => m.id === selectedMedicineId)?.name || formData.description) : formData.description,
           category: formData.category,
           type: formData.type,
+          payment_method: formData.payment_method,
           date: formData.date,
           quantity: formData.qty,
           amount: totalAmount, 
@@ -224,6 +229,7 @@ export default function AddTransactionModal({ isOpen, onClose, transactionToEdit
               description: item.name,
               category: "Obat & Vitamin",
               type: formData.type,
+              payment_method: formData.payment_method,
               date: formData.date,
               quantity: item.qty,
               amount: item.price * item.qty
@@ -246,6 +252,7 @@ export default function AddTransactionModal({ isOpen, onClose, transactionToEdit
              description: formData.description,
              category: formData.category,
              type: formData.type,
+             payment_method: formData.payment_method,
              date: formData.date,
              quantity: formData.qty,
              amount: totalAmount, 
@@ -308,7 +315,7 @@ export default function AddTransactionModal({ isOpen, onClose, transactionToEdit
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tanggal</label>
                     <input required type="date" className="w-full px-4 py-2 border rounded-xl text-sm" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} />
@@ -329,6 +336,19 @@ export default function AddTransactionModal({ isOpen, onClose, transactionToEdit
                       )}
                       
                       <option value="Lainnya">Lainnya</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Metode Pembayaran</label>
+                    <select
+                      className="w-full px-4 py-2 border rounded-xl bg-white text-sm font-medium"
+                      value={formData.payment_method}
+                      onChange={(e) => setFormData({...formData, payment_method: e.target.value})}
+                    >
+                      <option value="CASH">CASH</option>
+                      <option value="QRIS">QRIS</option>
+                      <option value="BPJS">BPJS</option>
+                      <option value="BKKBN">BKKBN</option>
                     </select>
                   </div>
                 </div>
