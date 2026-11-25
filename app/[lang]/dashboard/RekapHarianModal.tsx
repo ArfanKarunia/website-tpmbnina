@@ -53,6 +53,7 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
     const uniqueUmum = new Set();
     const uniqueKiaBpjs = new Set();
     const uniqueKiaNonBpjs = new Set();
+    const uniqueKb = new Set();
     let totalIncome = 0;
     let incomeTunai = 0;
     let incomeQris = 0;
@@ -69,6 +70,7 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
         if (t.description.includes('(Umum (BP))')) uniqueUmum.add(patientName);
         else if (t.description.includes('(KIA - BPJS)')) uniqueKiaBpjs.add(patientName);
         else if (t.description.includes('(KIA - Non BPJS)')) uniqueKiaNonBpjs.add(patientName);
+        else if (t.description.includes('(KB)')) uniqueKb.add(patientName);
       }
 
       // 2. LOGIKA HITUNG UANG (Pisahkan Tunai dan Non-Tunai)
@@ -103,7 +105,8 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
       countUmum: uniqueUmum.size, 
       countKiaBpjs: uniqueKiaBpjs.size, 
       countKiaNonBpjs: uniqueKiaNonBpjs.size,
-      totalPasien: uniqueUmum.size + uniqueKiaBpjs.size + uniqueKiaNonBpjs.size,
+      countKb: uniqueKb.size,
+      totalPasien: uniqueUmum.size + uniqueKiaBpjs.size + uniqueKiaNonBpjs.size + uniqueKb.size,
       income: totalIncome,
       incomeTunai,
       incomeNonTunai,
@@ -130,6 +133,7 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
         ["Umum (BP)", dailyRecap.countUmum],
         ["KIA - BPJS", dailyRecap.countKiaBpjs],
         ["KIA - Non BPJS", dailyRecap.countKiaNonBpjs],
+        ["KB", dailyRecap.countKb],
         ["TOTAL PASIEN", dailyRecap.totalPasien],
         [""],
         ["--- RINGKASAN KEUANGAN ---"],
@@ -207,7 +211,8 @@ export default function RekapHarianModal({ isOpen, onClose, transactions, userRo
                   <h4 className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 md:mb-3 flex items-center gap-2"><Activity size={12} className="md:w-3 md:h-3"/> Kunjungan Pasien</h4>
                   <div className="flex justify-between text-xs md:text-sm mb-2"><span className="text-gray-600">Umum (BP)</span><span className="font-bold text-gray-800">{dailyRecap.countUmum} Orang</span></div>
                   <div className="flex justify-between text-xs md:text-sm mb-2"><span className="text-gray-600">KIA - BPJS</span><span className="font-bold text-gray-800">{dailyRecap.countKiaBpjs} Orang</span></div>
-                  <div className="flex justify-between text-xs md:text-sm mb-3"><span className="text-gray-600">KIA - Non BPJS</span><span className="font-bold text-gray-800">{dailyRecap.countKiaNonBpjs} Orang</span></div>
+                  <div className="flex justify-between text-xs md:text-sm mb-2"><span className="text-gray-600">KIA - Non BPJS</span><span className="font-bold text-gray-800">{dailyRecap.countKiaNonBpjs} Orang</span></div>
+                  <div className="flex justify-between text-xs md:text-sm mb-3"><span className="text-gray-600">KB</span><span className="font-bold text-gray-800">{dailyRecap.countKb} Orang</span></div>
                   <div className="pt-2 md:pt-3 border-t border-dashed border-gray-200 flex justify-between"><span className="font-bold text-gray-800 text-xs md:text-sm">Total Pasien</span><span className="font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md text-xs md:text-sm">{dailyRecap.totalPasien} Orang</span></div>
                </div>
 
